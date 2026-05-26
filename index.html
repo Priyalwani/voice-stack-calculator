@@ -1,0 +1,4707 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Voice Stack Calculator</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.0/dist/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+
+<style>
+:root {
+  --yellow: #FFE600;
+  --yellow-hover: #FFD700;
+  --yellow-soft: #FFF9CC;
+  --black: #2E2E38;
+  --black-pure: #000000;
+  --grey-900: #1A1A24;
+  --grey-700: #4A4A55;
+  --grey-500: #747480;
+  --grey-300: #C4C4CD;
+  --grey-200: #E1E1E6;
+  --grey-100: #F0F0F2;
+  --grey-50: #F8F8FA;
+  --white: #FFFFFF;
+  --green: #2DB757;
+  --green-soft: #E4F7EC;
+  --blue: #336699;
+  --orange: #FF810A;
+  --red: #B9251C;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.04), 0 1px 3px rgba(0,0,0,0.06);
+  --shadow-md: 0 2px 4px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.08);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.10), 0 16px 48px rgba(0,0,0,0.08);
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  font-family: 'Space Grotesk', sans-serif;
+  background: var(--grey-50);
+  color: var(--black);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+.mono { font-family: 'JetBrains Mono', monospace; }
+
+/* ============ HEADER ============ */
+.header {
+  background: var(--white);
+  border-bottom: 1px solid var(--grey-200);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  box-shadow: var(--shadow-sm);
+}
+.header-inner {
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 18px 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.accent-bar {
+  width: 5px;
+  height: 36px;
+  background: var(--yellow);
+  border-radius: 2px;
+}
+.header-title {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--black);
+}
+.header-title span { color: var(--grey-500); font-weight: 500; }
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  font-size: 13px;
+}
+.currency-toggle {
+  display: inline-flex;
+  background: var(--grey-100);
+  border-radius: var(--radius-md);
+  padding: 3px;
+  border: 1px solid var(--grey-200);
+}
+.currency-toggle button {
+  border: none;
+  background: transparent;
+  padding: 6px 14px;
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 5px;
+  color: var(--grey-700);
+  transition: all 0.15s;
+}
+.currency-toggle button.active {
+  background: var(--black);
+  color: var(--yellow);
+}
+.verified {
+  color: var(--grey-500);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+}
+.fx-stamp {
+  color: var(--black);
+  background: var(--yellow-soft);
+  border: 1px solid var(--yellow);
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 600;
+}
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--green-soft);
+  color: var(--green);
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.status-badge.fallback { background: #FFF3CD; color: #856404; }
+.status-dot {
+  width: 6px; height: 6px;
+  background: currentColor;
+  border-radius: 50%;
+}
+
+/* ============ LAYOUT ============ */
+.container {
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 24px 32px;
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+/* ============ LEFT PANEL ============ */
+.left-panel {
+  position: sticky;
+  top: 90px;
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--grey-200);
+  box-shadow: 0 2px 10px rgba(46,46,56,0.04), 0 1px 0 rgba(46,46,56,0.02);
+  overflow: hidden;
+  max-height: calc(100vh - 110px);
+  overflow-y: auto;
+}
+.left-panel::-webkit-scrollbar { width: 6px; }
+.left-panel::-webkit-scrollbar-thumb { background: var(--grey-200); border-radius: 3px; }
+.panel-section {
+  padding: 22px 22px;
+  border-bottom: 1px solid var(--grey-100);
+  transition: background 0.2s;
+}
+.panel-section:last-child { border-bottom: none; }
+.section-title {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.10em;
+  color: var(--grey-500);
+  margin-bottom: 14px;
+}
+.field { margin-bottom: 14px; }
+.field:last-child { margin-bottom: 0; }
+.field-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--grey-700);
+  margin-bottom: 6px;
+}
+.input, .select {
+  width: 100%;
+  padding: 10px 12px;
+  font-family: inherit;
+  font-size: 13px;
+  border: 1px solid var(--grey-200);
+  border-radius: var(--radius-sm);
+  background: var(--white);
+  color: var(--black);
+  transition: border 0.15s, box-shadow 0.15s;
+}
+.input:focus, .select:focus {
+  outline: none;
+  border-color: var(--black);
+  box-shadow: 0 0 0 3px rgba(255,230,0,0.3);
+}
+.select { cursor: pointer; appearance: none; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' stroke='%232E2E38' stroke-width='1.5' fill='none' stroke-linecap='round'/></svg>"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; }
+.toggle-pill {
+  display: inline-flex;
+  background: var(--grey-100);
+  border-radius: var(--radius-sm);
+  padding: 3px;
+  width: 100%;
+  border: 1px solid var(--grey-200);
+}
+.toggle-pill button {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 6px 8px;
+  font-family: inherit;
+  font-weight: 500;
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 3px;
+  color: var(--grey-700);
+  transition: all 0.15s;
+}
+.toggle-pill button.active {
+  background: var(--white);
+  color: var(--black);
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+}
+
+.slider-row { display: flex; align-items: center; gap: 10px; }
+.slider-row input[type=range] { flex: 1; accent-color: var(--black); }
+.slider-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--grey-100);
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  min-width: 56px;
+  text-align: center;
+}
+
+.feature-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+}
+.feature-toggle label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--black);
+  cursor: pointer;
+}
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 20px;
+}
+.switch input { opacity: 0; width: 0; height: 0; }
+.switch-slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background: var(--grey-300);
+  transition: 0.2s;
+  border-radius: 20px;
+}
+.switch-slider::before {
+  position: absolute;
+  content: "";
+  height: 14px;
+  width: 14px;
+  left: 3px;
+  bottom: 3px;
+  background: var(--white);
+  transition: 0.2s;
+  border-radius: 50%;
+}
+.switch input:checked + .switch-slider { background: var(--black); }
+.switch input:checked + .switch-slider::before {
+  transform: translateX(16px);
+  background: var(--yellow);
+}
+
+.advanced-toggle {
+  width: 100%;
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--grey-500);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0;
+  margin-bottom: 14px;
+}
+.advanced-toggle:hover { color: var(--black); }
+.chev { transition: transform 0.2s; font-size: 10px; }
+.chev.open { transform: rotate(90deg); }
+.advanced-body { display: none; }
+.advanced-body.open { display: block; }
+
+.calculate-btn {
+  width: 100%;
+  padding: 14px 18px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--black);
+  background: var(--yellow);
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  letter-spacing: 0.02em;
+  transition: all 0.15s;
+  box-shadow: 0 2px 0 var(--black);
+}
+.calculate-btn:hover { background: var(--yellow-hover); transform: translateY(-1px); box-shadow: 0 3px 0 var(--black); }
+.calculate-btn:active { transform: translateY(1px); box-shadow: 0 1px 0 var(--black); }
+
+/* ============ RIGHT PANEL ============ */
+.right-panel { min-width: 0; }
+.tabs {
+  display: flex;
+  gap: 4px;
+  background: var(--white);
+  padding: 6px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--grey-200);
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 20px;
+}
+.tab {
+  flex: 1;
+  padding: 11px 14px;
+  background: transparent;
+  border: none;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--grey-700);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: all 0.15s;
+  position: relative;
+}
+.tab:hover { background: var(--grey-100); color: var(--black); }
+.tab.active { background: var(--black); color: var(--yellow); }
+.tab.master.active { background: var(--black); color: var(--yellow); }
+.tab.master::before {
+  content: "★";
+  margin-right: 4px;
+  color: var(--yellow);
+}
+.tab.master.active::before { color: var(--yellow); }
+.tab.master:not(.active)::before { color: var(--grey-500); }
+
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+.metrics-strip {
+  background: var(--white);
+  border: 1px solid var(--grey-200);
+  border-radius: var(--radius-md);
+  padding: 14px 18px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  flex-wrap: wrap;
+}
+.metric { display: flex; flex-direction: column; gap: 2px; }
+.metric-label {
+  font-size: 10px;
+  color: var(--grey-500);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+.metric-value { font-size: 15px; font-weight: 700; color: var(--black); }
+
+.token-toggle-btn {
+  background: var(--white);
+  border: 1px solid var(--grey-200);
+  border-radius: var(--radius-md);
+  padding: 10px 16px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--black);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  transition: all 0.15s;
+}
+.token-toggle-btn:hover { background: var(--grey-50); border-color: var(--grey-300); }
+.token-derivation {
+  display: none;
+  background: var(--black);
+  color: var(--white);
+  border-radius: var(--radius-md);
+  padding: 18px 22px;
+  margin-bottom: 16px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  line-height: 1.8;
+}
+.token-derivation.open { display: block; }
+.token-derivation .total {
+  border-top: 1px dashed var(--grey-500);
+  margin-top: 8px;
+  padding-top: 8px;
+  color: var(--yellow);
+  font-weight: 600;
+}
+
+/* ============ FILTER BAR ============ */
+.filter-card {
+  background: var(--white);
+  border: 1px solid var(--grey-200);
+  border-radius: var(--radius-md);
+  padding: 16px 18px;
+  margin-bottom: 16px;
+}
+.filter-section { margin-bottom: 12px; }
+.filter-section:last-child { margin-bottom: 0; }
+.filter-section-title {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--black);
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--grey-200);
+}
+.checkbox-row { display: flex; flex-wrap: wrap; gap: 6px 8px; }
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  font-size: 12px;
+  background: var(--white);
+  border: 1px solid var(--grey-200);
+  border-radius: 14px;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.15s;
+  font-weight: 500;
+  color: var(--grey-700);
+}
+.chip:hover { background: var(--grey-50); border-color: var(--grey-300); }
+.chip.checked {
+  background: var(--yellow);
+  color: var(--black);
+  border-color: var(--black);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+}
+.chip.checked:hover { background: var(--yellow-hover); }
+.chip input { display: none; }
+.chip .tick {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--black);
+  width: 12px;
+  display: inline-flex;
+  justify-content: center;
+}
+.quick-filters {
+  display: flex;
+  gap: 6px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--grey-200);
+  margin-top: 10px;
+}
+.quick-chip {
+  padding: 5px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--white);
+  border: 1px solid var(--grey-300);
+  border-radius: 14px;
+  cursor: pointer;
+  color: var(--grey-700);
+  font-family: inherit;
+  transition: all 0.15s;
+}
+.quick-chip:hover { background: var(--yellow); color: var(--black); border-color: var(--black); }
+
+/* ============ TABLES ============ */
+.table-card {
+  background: var(--white);
+  border: 1px solid var(--grey-200);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  margin-bottom: 20px;
+  box-shadow: 0 1px 0 rgba(46,46,56,0.03);
+}
+.table-scroll { overflow-x: auto; max-height: 600px; }
+table.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+table.data-table thead th {
+  background: var(--grey-50);
+  text-align: left;
+  padding: 14px 14px;
+  font-size: 12.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--black);
+  border-bottom: 2px solid var(--grey-300);
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+table.data-table thead th.cell-num { text-align: center; }
+table.data-table tbody td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--grey-100);
+  color: var(--black);
+}
+table.data-table tbody tr:last-child td { border-bottom: none; }
+table.data-table tbody tr:hover { background: var(--grey-50); }
+table.data-table tbody tr.cheapest {
+  background: var(--green-soft);
+  border-left: 3px solid var(--green);
+}
+table.data-table tbody tr.cheapest:hover { background: #D4F2DD; }
+table.data-table tbody tr.selected {
+  border-left: 3px solid var(--yellow);
+  background: var(--yellow-soft);
+}
+table.data-table tbody tr.selected:hover { background: #FFF1A0; }
+.cell-mono { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 500; }
+.cell-bold { font-weight: 700; color: var(--black); }
+.cell-num { text-align: center; font-family: 'JetBrains Mono', monospace; }
+table.data-table tbody td.cell-num { text-align: center; }
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 10px;
+  margin-right: 4px;
+  white-space: nowrap;
+}
+.badge-green { background: var(--green); color: var(--white); }
+.badge-yellow { background: var(--yellow); color: var(--black); }
+.badge-blue { background: var(--blue); color: var(--white); }
+.badge-orange { background: var(--orange); color: var(--white); }
+.badge-grey { background: var(--grey-200); color: var(--grey-700); }
+
+/* ============ CHART CARD ============ */
+.chart-card {
+  background: var(--white);
+  border: 1px solid var(--grey-200);
+  border-radius: var(--radius-md);
+  padding: 20px 22px;
+  margin-bottom: 20px;
+}
+.chart-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--black);
+  margin-bottom: 16px;
+}
+.chart-legend {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  margin-bottom: 14px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--grey-700);
+  flex-wrap: wrap;
+}
+.chart-legend .legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.chart-legend .legend-swatch {
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--grey-300);
+  border-radius: 2px;
+  display: inline-block;
+}
+.chart-container { position: relative; height: 360px; }
+
+/* ============ COMBINED TAB CONTROLS ============ */
+.combined-controls {
+  background: var(--white);
+  border: 1px solid var(--grey-200);
+  border-radius: var(--radius-md);
+  padding: 18px 22px;
+  margin-bottom: 16px;
+}
+.controls-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+.controls-row:last-child { margin-bottom: 0; }
+.control-group { display: flex; align-items: center; gap: 8px; }
+.control-group label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--grey-500);
+}
+.control-group .select { padding: 7px 28px 7px 10px; font-size: 12px; min-width: 160px; }
+
+.components-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--grey-200);
+}
+.radio-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--grey-100);
+  border: 1px solid var(--grey-200);
+  border-radius: 14px;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.15s;
+}
+.radio-chip:hover { background: var(--grey-200); }
+.radio-chip.checked {
+  background: var(--yellow);
+  color: var(--black);
+  border-color: var(--black);
+  font-weight: 700;
+}
+.radio-chip input { display: none; }
+
+/* ============ RECOMMENDED STACKS ============ */
+/* ============ RECOMMENDATION CARDS ============ */
+.rec-cards {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+  margin: 20px 0;
+}
+@media (min-width: 1280px) {
+  .rec-cards.cards-4 { grid-template-columns: repeat(4, 1fr); }
+}
+.rec-card {
+  background: var(--white);
+  border: 1px solid var(--grey-200);
+  border-radius: var(--radius-md);
+  padding: 18px;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.rec-card:hover { transform: translateY(-1px); box-shadow: var(--shadow-md); }
+.rec-card::before {
+  content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+}
+.rec-card.cheapest-batch::before    { background: #2D7A3D; }
+.rec-card.cheapest-realtime::before { background: #2D7A3D; }
+.rec-card.premium-batch::before     { background: #A33A3A; }
+.rec-card.premium-realtime::before  { background: #A33A3A; }
+.rec-card.cheapest::before          { background: #2D7A3D; }
+.rec-card.premium::before           { background: #A33A3A; }
+
+.rec-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--grey-700);
+  margin-bottom: 10px;
+}
+.rec-card.cheapest-batch .rec-label,
+.rec-card.cheapest-realtime .rec-label,
+.rec-card.cheapest .rec-label { color: #2D7A3D; }
+.rec-card.premium-batch .rec-label,
+.rec-card.premium-realtime .rec-label,
+.rec-card.premium .rec-label { color: #A33A3A; }
+
+.rec-stack {
+  margin-bottom: 12px;
+  flex: 1;
+}
+.rec-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 5px 0;
+  font-size: 12.5px;
+  color: var(--black);
+  gap: 10px;
+  line-height: 1.4;
+}
+.rec-leg {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9.5px;
+  font-weight: 700;
+  color: var(--grey-700);
+  background: var(--grey-100);
+  padding: 2px 6px;
+  border-radius: 3px;
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.rec-model { text-align: right; }
+
+.rec-cost {
+  padding: 10px 12px;
+  background: var(--grey-50);
+  border-radius: var(--radius-sm);
+  margin-bottom: 10px;
+  font-size: 12px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.rec-cost-block { display: flex; flex-direction: column; gap: 2px; }
+.rec-cost-label {
+  font-size: 9.5px;
+  color: var(--grey-500);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+.rec-cost-val {
+  color: var(--black);
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+}
+
+.rec-insight {
+  font-size: 11px;
+  color: var(--grey-700);
+  line-height: 1.5;
+  border-top: 1px dashed var(--grey-200);
+  padding-top: 10px;
+}
+.rec-insight strong { color: var(--black); }
+.rec-card.collision {
+  background: var(--grey-50);
+}
+.rec-card.collision .rec-cost-val { color: var(--grey-500); }
+.rec-collision-note {
+  font-size: 11px;
+  color: var(--grey-700);
+  font-style: italic;
+  padding: 10px 0;
+  text-align: center;
+}
+
+/* ============ CALC BREAKDOWN ============ */
+.breakdown-card {
+  background: var(--white);
+  border: 1px solid var(--grey-200);
+  border-radius: var(--radius-md);
+  margin-bottom: 100px;
+  overflow: hidden;
+}
+.breakdown-header {
+  padding: 16px 22px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+}
+.breakdown-header:hover { background: var(--grey-50); }
+.breakdown-header h3 {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--black);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.breakdown-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--grey-700);
+}
+.breakdown-controls label { font-weight: 500; }
+.breakdown-controls select {
+  padding: 5px 8px;
+  border: 1px solid var(--grey-300);
+  border-radius: var(--radius-sm);
+  background: var(--white);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--black);
+  cursor: pointer;
+}
+.breakdown-block {
+  margin-bottom: 24px;
+  padding-bottom: 18px;
+  border-bottom: 1px dashed var(--grey-700);
+}
+.breakdown-block:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
+.breakdown-block-header {
+  background: var(--yellow);
+  color: var(--black);
+  padding: 8px 14px;
+  margin: 0 -22px 12px;
+  font-weight: 700;
+  font-size: 12.5px;
+}
+.breakdown-block-header .subtitle {
+  font-weight: 500;
+  font-size: 11px;
+  color: var(--grey-700);
+  margin-top: 2px;
+}
+.breakdown-body {
+  display: none;
+  padding: 20px 22px;
+  border-top: 1px solid var(--grey-200);
+  background: var(--black);
+  color: var(--white);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  line-height: 1.8;
+  white-space: pre-wrap;
+}
+.breakdown-body.open { display: block; }
+.breakdown-body .step-title { color: var(--yellow); font-weight: 700; }
+.breakdown-body .divider { color: var(--grey-500); }
+.breakdown-body .total { color: var(--yellow); font-weight: 700; }
+.breakdown-body .label { color: var(--grey-300); }
+.breakdown-body .value { color: var(--white); font-weight: 600; }
+.breakdown-body h4 { color: var(--yellow); font-weight: 700; margin: 16px 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; }
+.breakdown-body h4:first-child { margin-top: 0; }
+.breakdown-body table { width: 100%; margin: 4px 0 12px; font-size: 11.5px; }
+.breakdown-body table td { padding: 3px 0; }
+.breakdown-body table td:first-child { color: var(--grey-300); }
+.breakdown-body table td:last-child { text-align: right; color: var(--white); font-weight: 600; }
+.breakdown-body table tr.total-row td { padding-top: 8px; border-top: 1px dashed var(--grey-500); color: var(--yellow) !important; font-weight: 700; }
+.breakdown-body .formula { background: var(--grey-900); padding: 4px 8px; border-radius: 3px; color: var(--yellow); display: inline-block; margin: 2px 0; font-size: 11px; }
+
+/* ============ NEW UX ELEMENTS ============ */
+.scenario-summary {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: var(--yellow-soft);
+  border-left: 3px solid var(--yellow);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  font-size: 12px;
+  color: var(--black);
+  line-height: 1.5;
+}
+.scenario-summary strong { font-weight: 700; }
+.field-hint {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--grey-500);
+  font-style: italic;
+}
+.control-group-grow { flex: 1 1 100%; }
+
+/* Platform dropdown chip - collapsed by default, expands models on click */
+.platform-block {
+  margin-bottom: 8px;
+  border: 1px solid var(--grey-200);
+  border-radius: var(--radius-md);
+  background: var(--white);
+  transition: all 0.15s;
+}
+.platform-block.all-selected {
+  border-color: var(--black);
+  background: linear-gradient(to right, var(--yellow-soft) 0%, var(--white) 8%);
+}
+.platform-block.none-selected { opacity: 0.55; }
+.platform-block-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  cursor: pointer;
+  user-select: none;
+  border-radius: var(--radius-md);
+}
+.platform-block-header:hover { background: var(--grey-50); }
+.platform-block.open .platform-block-header { border-radius: var(--radius-md) var(--radius-md) 0 0; }
+.platform-block-header .platform-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+.platform-block-header .platform-check input {
+  display: none;
+}
+.platform-block-header .platform-check .pcheck-box {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--grey-300);
+  border-radius: 4px;
+  background: var(--white);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: transparent;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.platform-block-header .platform-check input:checked + .pcheck-box {
+  background: var(--yellow);
+  border-color: var(--black);
+  color: var(--black);
+}
+.platform-block-header .platform-check.indeterminate .pcheck-box {
+  background: var(--yellow-soft);
+  border-color: var(--yellow);
+  color: var(--black);
+}
+.platform-block-header .platform-name { font-size: 13px; font-weight: 600; color: var(--black); }
+.platform-block-header .platform-count {
+  font-size: 10.5px;
+  color: var(--grey-700);
+  font-family: 'JetBrains Mono', monospace;
+  background: var(--grey-100);
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+.platform-block.all-selected .platform-block-header .platform-count {
+  background: var(--yellow);
+  color: var(--black);
+}
+.platform-block-header .platform-chev {
+  font-size: 9px;
+  color: var(--grey-500);
+  transition: transform 0.15s;
+}
+.platform-block.open .platform-block-header .platform-chev { transform: rotate(90deg); }
+.platform-block-body {
+  display: none;
+  padding: 6px 12px 12px 32px;
+  border-top: 1px solid var(--grey-100);
+}
+.platform-block.open .platform-block-body { display: block; }
+.platform-block-body .checkbox-row { gap: 6px; }
+.platform-block-body .chip {
+  font-size: 11px;
+  padding: 4px 10px;
+}
+
+.filter-section-controls {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.mode-toggle {
+  display: inline-flex;
+  border: 1px solid var(--grey-300);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  margin-left: auto;
+}
+.mode-btn {
+  background: var(--white);
+  border: none;
+  padding: 5px 14px;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--grey-700);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  border-right: 1px solid var(--grey-300);
+}
+.mode-btn:last-child { border-right: none; }
+.mode-btn:hover { background: var(--grey-50); color: var(--black); }
+.mode-btn.active {
+  background: var(--yellow);
+  color: var(--black);
+}
+.filter-action-btn {
+  background: var(--white);
+  border: 1px solid var(--grey-300);
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--black);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.filter-action-btn:hover { background: var(--grey-100); border-color: var(--black); }
+.filter-action-btn.primary { background: var(--yellow); border-color: var(--yellow); }
+.filter-action-btn.primary:hover { background: var(--yellow-hover); }
+
+.combined-axis-block {
+  margin-bottom: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--grey-100);
+}
+.combined-axis-block:last-child { border-bottom: none; padding-bottom: 0; margin-bottom: 0; }
+.combined-axis-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--black);
+  margin-bottom: 10px;
+}
+
+/* ============ EXPORT BAR ============ */
+.export-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--black);
+  color: var(--white);
+  padding: 12px 32px;
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  z-index: 40;
+  box-shadow: 0 -4px 16px rgba(0,0,0,0.15);
+}
+.export-btn {
+  background: var(--grey-900);
+  color: var(--white);
+  border: 1px solid var(--grey-700);
+  padding: 9px 16px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s;
+}
+.export-btn:hover { background: var(--yellow); color: var(--black); border-color: var(--yellow); }
+.export-btn.primary { background: var(--yellow); color: var(--black); border-color: var(--yellow); }
+.export-btn.primary:hover { background: var(--yellow-hover); }
+
+/* ============ MODALS ============ */
+.modal-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 100;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  overflow-y: auto;
+}
+.modal-backdrop.open { display: flex; }
+.modal {
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  max-width: 480px;
+  width: 90%;
+  padding: 28px;
+  box-shadow: var(--shadow-lg);
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.modal-wide { max-width: 560px; }
+.modal-title, .modal-subtitle { flex-shrink: 0; }
+#scopeBody {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  min-height: 0;
+  padding-right: 4px;
+  margin-right: -4px;
+}
+.modal-section { margin-bottom: 20px; }
+.modal-section:last-child { margin-bottom: 0; }
+.modal-section-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--grey-500);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 10px;
+}
+.sections-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.modal-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  border: 1px solid var(--grey-200);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 12.5px;
+  color: var(--grey-700);
+  background: var(--white);
+  font-weight: 500;
+  transition: all 0.15s;
+}
+.modal-checkbox input { display: none; }
+.modal-checkbox .checkbox-tick {
+  width: 16px; height: 16px;
+  border: 1.5px solid var(--grey-300);
+  border-radius: 3px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: transparent;
+  background: var(--white);
+  transition: all 0.15s;
+}
+.modal-checkbox:has(input:checked) {
+  border-color: var(--black);
+  background: var(--yellow-soft);
+  color: var(--black);
+  font-weight: 600;
+}
+.modal-checkbox:has(input:checked) .checkbox-tick {
+  background: var(--yellow);
+  border-color: var(--black);
+  color: var(--black);
+}
+.modal-checkbox:hover { border-color: var(--black); }
+.scope-count {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  background: var(--grey-100);
+  color: var(--grey-700);
+  border-radius: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 600;
+}
+.modal-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--black);
+  margin-bottom: 4px;
+}
+.modal-subtitle { font-size: 13px; color: var(--grey-700); margin-bottom: 18px; }
+.modal-options { display: flex; flex-direction: column; gap: 10px; margin-bottom: 0; }
+.modal-option {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--grey-200);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.modal-option:hover { border-color: var(--black); background: var(--grey-50); }
+.modal-option.selected { border-color: var(--black); background: var(--yellow-soft); }
+.modal-option input { accent-color: var(--black); }
+.modal-option .opt-label { font-size: 13px; font-weight: 600; color: var(--black); }
+.modal-option .opt-desc { font-size: 12px; color: var(--grey-500); margin-top: 2px; }
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--grey-200);
+  flex-shrink: 0;
+}
+.btn-secondary {
+  background: var(--white);
+  border: 1px solid var(--grey-300);
+  padding: 9px 18px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: var(--grey-700);
+}
+.btn-secondary:hover { background: var(--grey-100); }
+.btn-primary {
+  background: var(--black);
+  color: var(--yellow);
+  border: none;
+  padding: 9px 18px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.btn-primary:hover { background: var(--grey-900); }
+
+.field-row { margin-bottom: 14px; }
+.field-row label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--grey-500);
+  margin-bottom: 6px;
+}
+
+textarea.input {
+  font-family: inherit;
+  resize: vertical;
+  min-height: 70px;
+}
+
+/* ============ TOAST ============ */
+.toast {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: var(--black);
+  color: var(--yellow);
+  padding: 12px 20px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: 600;
+  opacity: 0;
+  transition: all 0.2s;
+  z-index: 200;
+  pointer-events: none;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ============ FOOTER ============ */
+.disclaimer {
+  text-align: center;
+  font-size: 11px;
+  color: var(--grey-500);
+  padding: 20px 32px 80px;
+  max-width: 800px;
+  margin: 0 auto;
+  line-height: 1.6;
+}
+
+/* ============ SCROLLBARS ============ */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: var(--grey-100); }
+::-webkit-scrollbar-thumb { background: var(--grey-300); border-radius: 5px; }
+::-webkit-scrollbar-thumb:hover { background: var(--grey-500); }
+
+/* ============ GO-TO-TOP BUTTON ============ */
+.go-to-top {
+  position: fixed;
+  bottom: 90px;
+  right: 24px;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--yellow);
+  color: var(--black);
+  border: 2px solid var(--black);
+  font-size: 22px;
+  font-weight: 700;
+  cursor: pointer;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 99;
+  box-shadow: 0 3px 0 var(--black), 0 8px 20px rgba(0,0,0,0.15);
+  transition: all 0.2s ease;
+  font-family: inherit;
+  line-height: 1;
+}
+.go-to-top.visible { display: flex; }
+.go-to-top:hover {
+  background: var(--yellow-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 5px 0 var(--black), 0 10px 24px rgba(0,0,0,0.18);
+}
+.go-to-top:active { transform: translateY(1px); box-shadow: 0 1px 0 var(--black); }
+
+/* ============ RESPONSIVE ============ */
+@media (max-width: 1100px) {
+  .container { grid-template-columns: 1fr; }
+  .left-panel { position: static; }
+  .rec-cards, .rec-cards.cards-4 { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="header">
+  <div class="header-inner">
+    <div class="header-left">
+      <div class="accent-bar"></div>
+      <div class="header-title">Voice Stack Calculator <span>· STT + LLM + TTS</span></div>
+    </div>
+    <div class="header-right">
+      <div class="currency-toggle" title="Switch currency (applies everywhere)">
+        <button data-cur="INR" class="active">INR</button>
+        <button data-cur="USD">USD</button>
+      </div>
+      <span class="fx-stamp" title="USD to INR exchange rate">1 USD = ₹<span id="fxStamp">95.24</span></span>
+      <span class="verified">Verified: <span id="verifiedDate">2025-05-25</span></span>
+      <span class="status-badge"><span class="status-dot"></span><span id="dataStatus">Live data</span></span>
+    </div>
+  </div>
+</header>
+
+<!-- MAIN LAYOUT -->
+<div class="container">
+
+  <!-- LEFT PANEL -->
+  <aside class="left-panel">
+
+    <div class="panel-section">
+      <div class="section-title">Volume</div>
+      <div class="field">
+        <label class="field-label">Input Mode</label>
+        <div class="toggle-pill" id="modeToggle">
+          <button data-mode="calls" class="active">Calls / Month</button>
+          <button data-mode="hours">Audio Hours</button>
+        </div>
+      </div>
+      <div class="field">
+        <label class="field-label">Volume</label>
+        <input type="number" class="input" id="volumeInput" value="20000" min="1">
+      </div>
+      <div class="field">
+        <label class="field-label">Avg Call Duration</label>
+        <div class="slider-row">
+          <input type="range" id="durationSlider" min="1" max="30" value="5">
+          <div class="slider-value"><span id="durationValue">5</span> min</div>
+        </div>
+      </div>
+      <div class="scenario-summary" id="scenarioSummary"></div>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-title">View</div>
+      <div class="field">
+        <label class="field-label">Show costs as</label>
+        <div class="toggle-pill toggle-pill-3" id="viewToggle">
+          <button data-view="monthly">Monthly</button>
+          <button data-view="annual">Annual</button>
+          <button data-view="both" class="active">Both</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-title">Features</div>
+      <div class="feature-toggle">
+        <label for="diarization">Diarization / Speaker ID</label>
+        <label class="switch">
+          <input type="checkbox" id="diarization">
+          <span class="switch-slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-title">Exchange Rate</div>
+      <div class="field">
+        <label class="field-label">USD → INR</label>
+        <input type="number" class="input" id="fxRate" value="95.24" step="0.01">
+        <div class="field-hint">Edit to apply a custom rate. Default refreshed 2025-05-25.</div>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <button class="advanced-toggle" id="advancedToggle">
+        <span>Advanced Settings</span>
+        <span class="chev">▶</span>
+      </button>
+      <div class="advanced-body" id="advancedBody">
+        <div class="field">
+          <label class="field-label">Transcript tokens / call</label>
+          <input type="number" class="input" id="transcriptTokens" value="1000">
+        </div>
+        <div class="field">
+          <label class="field-label">System prompt tokens</label>
+          <input type="number" class="input" id="sysTokens" value="1200">
+        </div>
+        <div class="field">
+          <label class="field-label">KB / context tokens</label>
+          <input type="number" class="input" id="kbTokens" value="500">
+        </div>
+        <div class="field">
+          <label class="field-label">Output tokens / call</label>
+          <input type="number" class="input" id="outTokens" value="800">
+        </div>
+        <div class="field">
+          <label class="field-label">Avg TTS response (chars)</label>
+          <input type="number" class="input" id="ttsChars" value="200">
+        </div>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <button class="calculate-btn" id="calculateBtn">Jump to Cost Breakdown ↓</button>
+    </div>
+  </aside>
+
+  <!-- RIGHT PANEL -->
+  <main class="right-panel">
+
+    <div class="tabs" id="tabs">
+      <button class="tab active" data-tab="stt">STT Costs</button>
+      <button class="tab" data-tab="llm">LLM Costs</button>
+      <button class="tab" data-tab="tts">TTS Costs</button>
+      <button class="tab master" data-tab="combined">Stack Comparison ★</button>
+    </div>
+
+    <!-- STT TAB -->
+    <div class="tab-content active" id="tab-stt">
+      <div class="metrics-strip" id="sttMetrics"></div>
+      <div class="filter-card" id="sttFilterCard"></div>
+      <div class="table-card">
+        <div class="table-scroll">
+          <table class="data-table" id="sttTable">
+            <thead></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Monthly STT Cost by Model</div>
+        <div class="chart-legend">
+          <span class="legend-item"><span class="legend-swatch" style="background:#FFE600;"></span>Batch</span>
+          <span class="legend-item"><span class="legend-swatch" style="background:#336699;"></span>Realtime</span>
+        </div>
+        <div class="chart-container"><canvas id="sttChart"></canvas></div>
+      </div>
+      <div class="rec-cards" id="sttRecCards"></div>
+    </div>
+
+    <!-- LLM TAB -->
+    <div class="tab-content" id="tab-llm">
+      <button class="token-toggle-btn" id="tokenToggleBtn">
+        <span class="chev">▶</span>
+        <span>View Token Calculation</span>
+      </button>
+      <div class="token-derivation" id="tokenDerivation"></div>
+      <div class="filter-card" id="llmFilterCard"></div>
+      <div class="table-card">
+        <div class="table-scroll">
+          <table class="data-table" id="llmTable">
+            <thead></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Monthly LLM Cost by Model</div>
+        <div class="chart-legend">
+          <span class="legend-item"><span class="legend-swatch" style="background:#FFE600;"></span>All LLMs (on-demand)</span>
+        </div>
+        <div class="chart-container"><canvas id="llmChart"></canvas></div>
+      </div>
+      <div class="rec-cards" id="llmRecCards"></div>
+    </div>
+
+    <!-- TTS TAB -->
+    <div class="tab-content" id="tab-tts">
+      <div class="metrics-strip" id="ttsMetrics"></div>
+      <div class="filter-card" id="ttsFilterCard"></div>
+      <div class="table-card">
+        <div class="table-scroll">
+          <table class="data-table" id="ttsTable">
+            <thead></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Monthly TTS Cost by Model</div>
+        <div class="chart-legend">
+          <span class="legend-item"><span class="legend-swatch" style="background:#FFE600;"></span>All TTS (character-based)</span>
+        </div>
+        <div class="chart-container"><canvas id="ttsChart"></canvas></div>
+      </div>
+      <div class="rec-cards" id="ttsRecCards"></div>
+    </div>
+
+    <!-- COMBINED TAB -->
+    <div class="tab-content" id="tab-combined">
+      <div class="combined-controls">
+        <div class="controls-row">
+          <div class="control-group">
+            <label>Sort by</label>
+            <select id="sortSelect" class="select">
+              <option value="total">Cheapest Overall</option>
+              <option value="stt">Cheapest STT</option>
+              <option value="llm">Cheapest LLM</option>
+              <option value="tts">Cheapest TTS</option>
+            </select>
+          </div>
+          <div class="control-group control-group-grow">
+            <label>Cost Components to Include</label>
+            <div class="components-grid" id="componentsGrid">
+              <label class="radio-chip checked"><input type="radio" name="comp" value="all" checked>All (STT + LLM + TTS)</label>
+              <label class="radio-chip"><input type="radio" name="comp" value="stt_llm">STT + LLM</label>
+              <label class="radio-chip"><input type="radio" name="comp" value="stt_tts">STT + TTS</label>
+              <label class="radio-chip"><input type="radio" name="comp" value="llm_tts">LLM + TTS</label>
+              <label class="radio-chip"><input type="radio" name="comp" value="stt">STT only</label>
+              <label class="radio-chip"><input type="radio" name="comp" value="llm">LLM only</label>
+              <label class="radio-chip"><input type="radio" name="comp" value="tts">TTS only</label>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="filter-card" id="combinedFilterCard"></div>
+      <div class="table-card">
+        <div class="table-scroll">
+          <table class="data-table" id="combinedTable">
+            <thead></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title" id="combinedChartTitle">Stack Comparison (top 20)</div>
+        <div class="chart-legend">
+          <span class="legend-item"><span class="legend-swatch" style="background:#336699;"></span>STT cost</span>
+          <span class="legend-item"><span class="legend-swatch" style="background:#FFE600;"></span>LLM cost</span>
+          <span class="legend-item"><span class="legend-swatch" style="background:#FF810A;"></span>TTS cost</span>
+        </div>
+        <div class="chart-container"><canvas id="combinedChart"></canvas></div>
+      </div>
+      <div class="rec-cards" id="combinedRecCards"></div>
+    </div>
+
+    <!-- CALC BREAKDOWN -->
+    <div class="breakdown-card" id="breakdownCard">
+      <div class="breakdown-header" id="breakdownHeader">
+        <h3><span class="chev open" id="breakdownChev">▶</span> Cost Calculation Breakdown</h3>
+        <div class="breakdown-controls" onclick="event.stopPropagation()">
+          <label for="breakdownCount">Show top</label>
+          <select id="breakdownCount" class="select">
+            <option value="1" selected>1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+          </select>
+        </div>
+      </div>
+      <div class="breakdown-body open" id="breakdownBody"></div>
+    </div>
+
+  </main>
+</div>
+
+<!-- EXPORT BAR -->
+<div class="export-bar">
+  <button class="export-btn primary" data-export="pdf">📄 PDF Report</button>
+  <button class="export-btn" data-export="excel">📊 Export Excel</button>
+  <button class="export-btn" data-export="link">🔗 Copy Link</button>
+</div>
+
+<!-- GO TO TOP — floating button -->
+<button id="goToTopBtn" class="go-to-top" title="Back to top" aria-label="Back to top">↑</button>
+
+<!-- TOAST -->
+<div id="toast" class="toast"></div>
+
+<!-- SCOPE MODAL — dynamic content based on active tab -->
+<div class="modal-backdrop" id="scopeModal">
+  <div class="modal modal-wide">
+    <div class="modal-title" id="scopeTitle">Export Report</div>
+    <div class="modal-subtitle" id="scopeSubtitle">Configure your export.</div>
+    <div id="scopeBody">
+      <div class="modal-section">
+        <div class="modal-section-label">Scope</div>
+        <div class="modal-options" id="scopeOptions">
+          <label class="modal-option selected">
+            <input type="radio" name="scope" value="filtered" checked>
+            <div>
+              <div class="opt-label">Filtered selection only</div>
+              <div class="opt-desc" id="scopeFilteredDesc">What's currently visible after your filters</div>
+            </div>
+          </label>
+          <label class="modal-option">
+            <input type="radio" name="scope" value="all">
+            <div>
+              <div class="opt-label">All platforms & models</div>
+              <div class="opt-desc" id="scopeAllDesc">Full comparison across every option</div>
+            </div>
+          </label>
+        </div>
+      </div>
+      <div class="modal-section" id="scopeSectionsContainer">
+        <div class="modal-section-label">Include in report</div>
+        <div class="sections-grid" id="scopeSectionsList"></div>
+      </div>
+      <div class="modal-section">
+        <label class="modal-checkbox" id="scopeBreakdownChip">
+          <input type="checkbox" id="scopeIncludeBreakdowns">
+          <span class="checkbox-tick">✓</span>
+          <span>Include top 5 cost breakdowns</span>
+        </label>
+      </div>
+      <div class="modal-section" id="scopeClientSection">
+        <label class="modal-checkbox" id="scopeClientChip">
+          <input type="checkbox" id="scopeCustomizeForClient">
+          <span class="checkbox-tick">✓</span>
+          <span>Customize for client / stakeholder (optional)</span>
+        </label>
+        <div id="scopeClientFields" style="display:none; margin-top:14px; padding-top:14px; border-top:1px dashed var(--grey-200);">
+          <div class="field-row">
+            <label>Client Name</label>
+            <input type="text" class="input" id="clientName" placeholder="e.g., UK-based Telecom Provider">
+          </div>
+          <div class="field-row">
+            <label>Your Name / Brand</label>
+            <input type="text" class="input" id="clientBrand" placeholder="e.g., John Doe">
+          </div>
+          <div class="field-row">
+            <label>Date</label>
+            <input type="date" class="input" id="clientDate">
+          </div>
+          <div class="field-row">
+            <label>Report Title</label>
+            <input type="text" class="input" id="clientTitle" placeholder="AI Voice Stack Cost Proposal">
+          </div>
+          <div class="field-row">
+            <label>Notes</label>
+            <textarea class="input" id="clientNotes" placeholder="Any custom message or context..."></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary" id="scopeCancel">Cancel</button>
+      <button class="btn-primary" id="scopeContinue">Generate</button>
+    </div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<div class="disclaimer">
+  Prices sourced from official provider pages. Last verified: <span class="verified-footer">2025-05-25</span>. Confirm with provider before purchase. Exchange rate: 1 USD = ₹<span class="fx-footer">95.24</span>.
+</div>
+
+<script id="appScript">
+
+
+// ====== app1.js ======
+// ====================================================================
+// VOICE STACK CALCULATOR — App Logic
+// ====================================================================
+
+const CONFIG = {
+  usd_to_inr: 95.24,
+  last_verified: "2025-05-25",
+  data_status: "live"
+};
+
+// STT data — all prices verified against official provider pages 2025-05-25
+// diarization_flat_usd_per_hr = flat $/hr add-on (0 = included or not applicable)
+const STT_DATA = [
+  { id:"azure_batch", platform:"Azure", model_name:"Standard Batch", mode:"Batch", rate_usd_per_hour:0.18, diarization_flat_usd_per_hr:0.00, latency:"Async", notes:"Diarization included with batch (azure.microsoft.com)" },
+  { id:"azure_fast", platform:"Azure", model_name:"Fast Transcription", mode:"Fast", rate_usd_per_hour:0.36, diarization_flat_usd_per_hr:0.00, latency:"Near-RT", notes:"Part of batch family; diarization included" },
+  { id:"azure_realtime", platform:"Azure", model_name:"Standard Realtime", mode:"Realtime", rate_usd_per_hour:1.00, diarization_flat_usd_per_hr:0.30, latency:"Realtime", notes:"Real-time only diarization add-on: $0.30/hr" },
+  { id:"deepgram_nova3_batch", platform:"Deepgram", model_name:"Nova-3 English", mode:"Batch", rate_usd_per_hour:0.258, diarization_flat_usd_per_hr:0.12, latency:"Async", notes:"Diarization add-on $0.0020/min = $0.12/hr (deepgram.com)" },
+  { id:"deepgram_nova3_stream", platform:"Deepgram", model_name:"Nova-3 Streaming", mode:"Realtime", rate_usd_per_hour:0.462, diarization_flat_usd_per_hr:0.12, latency:"Realtime", notes:"Diarization add-on $0.0020/min = $0.12/hr (deepgram.com)" },
+  { id:"assemblyai_universal2", platform:"AssemblyAI", model_name:"Universal-2", mode:"Batch", rate_usd_per_hour:0.15, diarization_flat_usd_per_hr:0.02, latency:"Async", notes:"Diarization add-on $0.02/hr (assemblyai.com)" },
+  { id:"assemblyai_stream", platform:"AssemblyAI", model_name:"Universal-Streaming", mode:"Realtime", rate_usd_per_hour:0.15, diarization_flat_usd_per_hr:0.12, latency:"Realtime", notes:"Streaming diarization add-on $0.12/hr (assemblyai.com)" },
+  { id:"openai_4o_transcribe", platform:"OpenAI", model_name:"GPT-4o Transcribe", mode:"Batch", rate_usd_per_hour:0.36, diarization_flat_usd_per_hr:0.00, latency:"Async", notes:"Diarize variant model at same per-min rate" },
+  { id:"openai_realtime_stt", platform:"OpenAI", model_name:"GPT-Realtime", mode:"Realtime", rate_usd_per_hour:1.02, diarization_flat_usd_per_hr:0.00, latency:"Realtime", notes:"gpt-realtime-whisper; speaker labels included" },
+  { id:"google_chirp3_batch", platform:"Google Cloud", model_name:"Chirp 3 Dynamic Batch", mode:"Batch", rate_usd_per_hour:0.18, diarization_flat_usd_per_hr:0.00, latency:"Async (24hr SLA)", notes:"Dynamic Batch — ideal for post-call analytics/archives; diarization included" },
+  { id:"google_chirp3_realtime", platform:"Google Cloud", model_name:"Chirp 3 Standard", mode:"Realtime", rate_usd_per_hour:0.96, diarization_flat_usd_per_hr:0.00, latency:"Realtime", notes:"Standard tier (sync + streaming); diarization included in Chirp 3 model" },
+  { id:"aws_transcribe", platform:"AWS Transcribe", model_name:"Standard Tier 1", mode:"Both", rate_usd_per_hour:1.44, diarization_flat_usd_per_hr:0.00, latency:"Both", notes:"Tier 1; speaker labels included in base rate" },
+  { id:"elevenlabs_scribe", platform:"ElevenLabs", model_name:"Scribe v1/v2", mode:"Batch", rate_usd_per_hour:0.22, diarization_flat_usd_per_hr:0.00, latency:"Async", notes:"Business-tier rate; diarization up to 32 speakers included" },
+  { id:"elevenlabs_scribe_rt", platform:"ElevenLabs", model_name:"Scribe v2 Realtime", mode:"Realtime", rate_usd_per_hour:0.39, diarization_flat_usd_per_hr:0.00, latency:"Realtime", notes:"Business-tier rate; diarization NOT supported on realtime" },
+  { id:"sarvam_saarika", platform:"Sarvam AI", model_name:"Sarvam Speech-to-Text", mode:"Batch", rate_usd_per_hour:0.3150, diarization_flat_usd_per_hr:0.1575, latency:"Async", notes:"INR-native (₹30/hr base + ₹15/hr diarization = ₹45/hr)" },
+  { id:"sarvam_saaras", platform:"Sarvam AI", model_name:"Sarvam Speech-to-Text & Translate", mode:"Batch", rate_usd_per_hour:0.3150, diarization_flat_usd_per_hr:0.1575, latency:"Async", notes:"INR-native ₹30/hr base + ₹15/hr diariz. Transcribes + translates Indic audio → English." },
+  { id:"bhashini_asr", platform:"Bhashini", model_name:"ASR Indian Lang", mode:"Batch", rate_usd_per_hour:0.00, diarization_flat_usd_per_hr:0.00, latency:"Async", notes:"Govt of India free tier; diarization N/A" },
+];
+
+const LLM_DATA = [
+  { id:"gpt5_nano", model_name:"GPT-5-nano", provider:"OpenAI", input_per_1m_usd:0.05, output_per_1m_usd:0.40, notes:"Cheapest GPT-5 tier" },
+  { id:"gpt41_nano", model_name:"GPT-4.1-nano", provider:"OpenAI", input_per_1m_usd:0.10, output_per_1m_usd:0.40, notes:"Latest nano" },
+  { id:"gpt4o_mini", model_name:"GPT-4o-mini", provider:"OpenAI", input_per_1m_usd:0.15, output_per_1m_usd:0.60, notes:"Workhorse cheap model" },
+  { id:"gpt4o", model_name:"GPT-4o", provider:"OpenAI", input_per_1m_usd:2.50, output_per_1m_usd:10.00, notes:"Premium tier" },
+  { id:"claude_haiku_45", model_name:"Claude Haiku 4.5", provider:"Anthropic", input_per_1m_usd:1.00, output_per_1m_usd:5.00, notes:"Fastest Claude" },
+  { id:"claude_sonnet_46", model_name:"Claude Sonnet 4.6", provider:"Anthropic", input_per_1m_usd:3.00, output_per_1m_usd:15.00, notes:"Most capable mid-tier" },
+  { id:"gemini_2_flash", model_name:"Gemini 2.0 Flash", provider:"Google", input_per_1m_usd:0.10, output_per_1m_usd:0.40, notes:"Cheap and fast" },
+  { id:"gemini_25_pro", model_name:"Gemini 2.5 Pro", provider:"Google", input_per_1m_usd:1.25, output_per_1m_usd:10.00, notes:"Reasoning model" },
+  { id:"sarvam_30b", model_name:"Sarvam-30B (Chat)", provider:"Sarvam", input_per_1m_usd:0.02625, output_per_1m_usd:0.10500, inr_native:true, input_per_1m_inr:2.5, output_per_1m_inr:10, notes:"INR-native (₹2.5 in / ₹10 out per 1M). Cached input ₹1.5/1M." },
+  { id:"sarvam_105b", model_name:"Sarvam-105B / Indus", provider:"Sarvam", input_per_1m_usd:0.04200, output_per_1m_usd:0.16800, inr_native:true, input_per_1m_inr:4, output_per_1m_inr:16, notes:"INR-native (₹4 in / ₹16 out per 1M). Cached input ₹2.5/1M." },
+];
+
+const TTS_DATA = [
+  { id:"google_standard", platform:"Google Cloud", model_name:"Standard Voices", tier:"Standard", rate_usd_per_1m_chars:4.00, notes:"First 1M chars free per month" },
+  { id:"aws_polly_standard", platform:"AWS Polly", model_name:"Standard Voices", tier:"Standard", rate_usd_per_1m_chars:4.00, notes:"$4/1M chars (aws.amazon.com)" },
+  { id:"aws_polly_neural", platform:"AWS Polly", model_name:"Neural Voices", tier:"Premium", rate_usd_per_1m_chars:19.20, notes:"$19.20/1M chars neural" },
+  { id:"aws_polly_generative", platform:"AWS Polly", model_name:"Generative Voices", tier:"Premium", rate_usd_per_1m_chars:30.00, notes:"$30/1M chars generative" },
+  { id:"openai_tts1", platform:"OpenAI", model_name:"TTS-1", tier:"Standard", rate_usd_per_1m_chars:15.00, notes:"Standard quality (openai.com)" },
+  { id:"openai_tts1_hd", platform:"OpenAI", model_name:"TTS-1-HD", tier:"Premium", rate_usd_per_1m_chars:30.00, notes:"HD quality (openai.com)" },
+  { id:"azure_neural", platform:"Azure", model_name:"Neural Standard", tier:"Standard", rate_usd_per_1m_chars:15.00, notes:"Prebuilt neural voices (azure.microsoft.com)" },
+  { id:"azure_hd", platform:"Azure", model_name:"HD Voices", tier:"Premium", rate_usd_per_1m_chars:22.00, notes:"HD voices reduced March 2026" },
+  { id:"deepgram_aura2", platform:"Deepgram", model_name:"Aura-2 Streaming", tier:"Standard", rate_usd_per_1m_chars:30.00, notes:"Aura-2 $0.030/1K chars (deepgram.com)" },
+  { id:"elevenlabs_flash", platform:"ElevenLabs", model_name:"Flash v2.5", tier:"Standard", rate_usd_per_1m_chars:50.00, notes:"Official API rate $0.05/1K chars (elevenlabs.io/pricing/api)" },
+  { id:"sarvam_bulbul_std", platform:"Sarvam AI", model_name:"Bulbul v2 Standard", tier:"Standard", rate_usd_per_1m_chars:15.75, notes:"INR-native ₹1,500/1M chars" },
+  { id:"sarvam_bulbul_prem", platform:"Sarvam AI", model_name:"Bulbul v3 Premium", tier:"Premium", rate_usd_per_1m_chars:31.50, notes:"INR-native ₹3,000/1M chars" },
+  { id:"bhashini_tts", platform:"Bhashini", model_name:"TTS Indian Lang", tier:"Standard", rate_usd_per_1m_chars:0.00, notes:"Govt of India free tier" },
+];
+
+// Recommendations are auto-computed at render time from the current
+// Combined-tab filters (see renderRecommendations in app2.js).
+// No hard-coded RECOMMENDED list — that approach broke when models were filtered out.
+
+// =======================
+// STATE
+// =======================
+const state = {
+  currency: "INR",
+  mode: "calls",
+  volume: 20000,
+  duration: 5,
+  llmId: "gpt4o_mini",       // used as default LLM for Combined tab and share links
+  diarization: false,
+  transcriptTokens: 1000,
+  sysTokens: 1200,
+  kbTokens: 500,
+  outTokens: 800,
+  ttsChars: 200,
+  fx: 95.24,
+  view: "both",              // monthly | annual | both — GLOBAL
+  components: "all",
+  sort: "total",
+  filters: {
+    stt: { platforms:new Set(), models:new Set() },
+    llm: { platforms:new Set(), models:new Set() },
+    tts: { platforms:new Set(), models:new Set() },
+    combined_stt: { platforms:new Set(), models:new Set() },
+    combined_llm: { platforms:new Set(), models:new Set() },
+    combined_tts: { platforms:new Set(), models:new Set() },
+  },
+  charts: {}
+};
+
+// =======================
+// UTIL
+// =======================
+const $ = id => document.getElementById(id);
+const fmt = n => {
+  if (n === null || n === undefined || isNaN(n)) return "—";
+  const sym = state.currency === "INR" ? "₹" : "$";
+  const val = state.currency === "INR" ? n : n / state.fx;
+  // Indian-style grouping for INR, US-style for USD
+  if (state.currency === "INR") {
+    return sym + Math.round(val).toLocaleString("en-IN");
+  }
+  return sym + val.toLocaleString("en-US", { maximumFractionDigits: 2 });
+};
+const fmtRate = n => {
+  if (n === null || n === undefined || isNaN(n)) return "—";
+  const sym = state.currency === "INR" ? "₹" : "$";
+  const val = state.currency === "INR" ? n : n / state.fx;
+  return sym + val.toLocaleString(state.currency === "INR" ? "en-IN" : "en-US", { maximumFractionDigits: 2 });
+};
+const showToast = msg => {
+  const t = $("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 2200);
+};
+
+// =======================
+// CALCULATIONS
+// =======================
+function audioHours() {
+  return state.mode === "calls" ? (state.volume * state.duration) / 60 : state.volume;
+}
+function numCalls() {
+  return state.mode === "calls" ? state.volume : Math.round(state.volume * 60 / state.duration);
+}
+function totalInputTokens() { return (state.transcriptTokens + state.sysTokens + state.kbTokens) * numCalls(); }
+function totalOutputTokens() { return state.outTokens * numCalls(); }
+function totalTtsChars() { return state.ttsChars * numCalls(); }
+
+function sttMonthlyINR(stt) {
+  let rate = stt.rate_usd_per_hour;
+  if (state.diarization && stt.diarization_flat_usd_per_hr) rate += stt.diarization_flat_usd_per_hr;
+  return rate * audioHours() * state.fx;
+}
+function llmMonthlyINR(llm) {
+  if (llm.input_per_1m_usd === null) return null;
+  const inCost = (totalInputTokens() / 1e6) * llm.input_per_1m_usd;
+  const outCost = (totalOutputTokens() / 1e6) * llm.output_per_1m_usd;
+  return (inCost + outCost) * state.fx;
+}
+function ttsMonthlyINR(tts) {
+  return (totalTtsChars() / 1e6) * tts.rate_usd_per_1m_chars * state.fx;
+}
+function llmInputCostINR(llm) {
+  if (llm.input_per_1m_usd === null) return null;
+  return (totalInputTokens() / 1e6) * llm.input_per_1m_usd * state.fx;
+}
+function llmOutputCostINR(llm) {
+  if (llm.output_per_1m_usd === null) return null;
+  return (totalOutputTokens() / 1e6) * llm.output_per_1m_usd * state.fx;
+}
+
+function getDiarizationRate(stt) {
+  let rate = stt.rate_usd_per_hour;
+  if (state.diarization && stt.diarization_flat_usd_per_hr) rate += stt.diarization_flat_usd_per_hr;
+  return rate * state.fx;
+}
+
+// =======================
+// FILTER INIT
+// =======================
+function initFilters() {
+  STT_DATA.forEach(s => { state.filters.stt.platforms.add(s.platform); state.filters.stt.models.add(s.id); });
+  LLM_DATA.forEach(l => { state.filters.llm.platforms.add(l.provider); state.filters.llm.models.add(l.id); });
+  TTS_DATA.forEach(t => { state.filters.tts.platforms.add(t.platform); state.filters.tts.models.add(t.id); });
+  STT_DATA.forEach(s => { state.filters.combined_stt.platforms.add(s.platform); state.filters.combined_stt.models.add(s.id); });
+  LLM_DATA.forEach(l => { state.filters.combined_llm.platforms.add(l.provider); state.filters.combined_llm.models.add(l.id); });
+  TTS_DATA.forEach(t => { state.filters.combined_tts.platforms.add(t.platform); state.filters.combined_tts.models.add(t.id); });
+  // Mode toggle (Realtime/Batch/Both) per STT filter context — defaults to "both"
+  state._modeToggle = { stt: "both", combined_stt: "both" };
+}
+
+function filteredSTT(filterKey="stt") {
+  const baseFilter = state.filters[filterKey];
+  const modeToggle = (state._modeToggle && state._modeToggle[filterKey]) || "both";
+  return STT_DATA.filter(s => {
+    if (!baseFilter.platforms.has(s.platform)) return false;
+    if (!baseFilter.models.has(s.id)) return false;
+    // Apply mode toggle
+    if (modeToggle === "realtime") {
+      return s.mode === "Realtime" || s.latency === "Realtime";
+    }
+    if (modeToggle === "batch") {
+      return s.mode === "Batch" || (s.latency && s.latency.startsWith && s.latency.startsWith("Async"));
+    }
+    return true; // "both"
+  });
+}
+function filteredLLM(filterKey="llm") {
+  return LLM_DATA.filter(l =>
+    state.filters[filterKey].platforms.has(l.provider) &&
+    state.filters[filterKey].models.has(l.id)
+  );
+}
+function filteredTTS(filterKey="tts") {
+  return TTS_DATA.filter(t =>
+    state.filters[filterKey].platforms.has(t.platform) &&
+    state.filters[filterKey].models.has(t.id)
+  );
+}
+
+// =======================
+// FILTER UI — platform-collapsible blocks with Select All / Clear All
+// =======================
+function buildFilterCard(target, opts) {
+  // opts: { filterKey, data, platformField, modelField, modelDisplay, quickFilters, platformLabel }
+  const filter = state.filters[opts.filterKey];
+  const platforms = [...new Set(opts.data.map(d => d[opts.platformField]))];
+
+  // For each platform, build a collapsible block with its models inside
+  const blocks = platforms.map(p => {
+    const modelsForPlatform = opts.data.filter(d => d[opts.platformField] === p);
+    const platformChecked = filter.platforms.has(p);
+    const selectedCount = modelsForPlatform.filter(d => filter.models.has(d[opts.modelField])).length;
+    const totalCount = modelsForPlatform.length;
+    const isOpen = state._openPlatforms && state._openPlatforms.has(`${opts.filterKey}|${p}`);
+
+    const modelChips = modelsForPlatform.map(d => {
+      const checked = filter.models.has(d[opts.modelField]) ? "checked" : "";
+      const label = typeof opts.modelDisplay === "function" ? opts.modelDisplay(d) : d.model_name;
+      return `<label class="chip ${checked}" data-type="model" data-value="${d[opts.modelField]}" data-filter="${opts.filterKey}">
+        <input type="checkbox" ${checked ? "checked":""}>
+        <span class="tick">${checked ? "✓":""}</span>${label}
+      </label>`;
+    }).join("");
+
+    const partialState = (selectedCount > 0 && selectedCount < totalCount) ? "indeterminate" : "";
+    return `<div class="platform-block ${isOpen ? "open" : ""} ${selectedCount === totalCount ? "all-selected" : (selectedCount === 0 ? "none-selected" : "")}" data-platform="${p}" data-filter="${opts.filterKey}">
+      <div class="platform-block-header">
+        <div class="platform-check ${partialState}" data-type="platform" data-value="${p}" data-filter="${opts.filterKey}">
+          <input type="checkbox" ${platformChecked ? "checked" : ""}>
+          <span class="pcheck-box">✓</span>
+          <span class="platform-name">${p}</span>
+        </div>
+        <span class="platform-count">${selectedCount}/${totalCount}</span>
+        <span class="platform-chev">▶</span>
+      </div>
+      <div class="platform-block-body">
+        <div class="checkbox-row">${modelChips}</div>
+      </div>
+    </div>`;
+  }).join("");
+
+  const quickFiltersHtml = (opts.quickFilters || []).map(q =>
+    `<button class="quick-chip" data-quick="${q.id}" data-filter="${opts.filterKey}">${q.label}</button>`
+  ).join("");
+
+  // Mode toggle (Realtime / Batch / Both) — shown only when the filter card opts in
+  const showModeToggle = opts.showModeToggle === true;
+  const currentMode = (state._modeToggle && state._modeToggle[opts.filterKey]) || "both";
+  const modeToggleHtml = showModeToggle ? `
+    <div class="mode-toggle" data-filter="${opts.filterKey}">
+      <button class="mode-btn ${currentMode === "both" ? "active" : ""}" data-mode="both" data-filter="${opts.filterKey}">Both</button>
+      <button class="mode-btn ${currentMode === "realtime" ? "active" : ""}" data-mode="realtime" data-filter="${opts.filterKey}">Realtime</button>
+      <button class="mode-btn ${currentMode === "batch" ? "active" : ""}" data-mode="batch" data-filter="${opts.filterKey}">Batch</button>
+    </div>
+  ` : "";
+
+  target.innerHTML = `
+    <div class="filter-section">
+      <div class="filter-section-title">${opts.platformLabel || "Platforms & Models"}</div>
+      <div class="filter-section-controls">
+        <button class="filter-action-btn primary" data-action="select-all" data-filter="${opts.filterKey}">Select All</button>
+        <button class="filter-action-btn" data-action="clear-all" data-filter="${opts.filterKey}">Clear All</button>
+        ${modeToggleHtml}
+      </div>
+      <div class="platform-blocks">${blocks}</div>
+    </div>
+    ${quickFiltersHtml ? `<div class="quick-filters">${quickFiltersHtml}</div>` : ""}
+  `;
+}
+
+function bindFilterEvents(card, opts) {
+  // Toggle platform block open/closed when clicking the row (not the checkbox)
+  card.querySelectorAll(".platform-block-header").forEach(hdr => {
+    hdr.addEventListener("click", e => {
+      // Don't toggle if user clicked the platform checkbox or its label
+      if (e.target.closest(".platform-check")) return;
+      const block = hdr.closest(".platform-block");
+      const key = `${opts.filterKey}|${block.dataset.platform}`;
+      state._openPlatforms = state._openPlatforms || new Set();
+      if (state._openPlatforms.has(key)) state._openPlatforms.delete(key);
+      else state._openPlatforms.add(key);
+      block.classList.toggle("open");
+    });
+  });
+
+  // Platform checkbox: toggles all models for that platform
+  card.querySelectorAll("[data-type=platform]").forEach(chip => {
+    chip.addEventListener("click", e => {
+      e.stopPropagation();
+      const filter = state.filters[opts.filterKey];
+      const val = chip.dataset.value;
+      if (filter.platforms.has(val)) {
+        filter.platforms.delete(val);
+        opts.data.filter(d => d[opts.platformField] === val).forEach(d => filter.models.delete(d[opts.modelField]));
+      } else {
+        filter.platforms.add(val);
+        opts.data.filter(d => d[opts.platformField] === val).forEach(d => filter.models.add(d[opts.modelField]));
+      }
+      rebuildFilterCard(opts);
+      renderAll();
+    });
+  });
+
+  // Model chip click
+  card.querySelectorAll("[data-type=model]").forEach(chip => {
+    chip.addEventListener("click", e => {
+      e.preventDefault();
+      e.stopPropagation();
+      const filter = state.filters[opts.filterKey];
+      const val = chip.dataset.value;
+      const platformOfModel = opts.data.find(d => d[opts.modelField] === val)[opts.platformField];
+      if (filter.models.has(val)) {
+        filter.models.delete(val);
+        // If no models of this platform remain, uncheck platform
+        const stillHasModels = opts.data.some(d => d[opts.platformField] === platformOfModel && filter.models.has(d[opts.modelField]));
+        if (!stillHasModels) filter.platforms.delete(platformOfModel);
+      } else {
+        filter.models.add(val);
+        filter.platforms.add(platformOfModel);
+      }
+      rebuildFilterCard(opts);
+      renderAll();
+    });
+  });
+
+  // Select All / Clear All buttons
+  card.querySelectorAll("[data-action]").forEach(btn => {
+    btn.addEventListener("click", e => {
+      const filter = state.filters[opts.filterKey];
+      const action = btn.dataset.action;
+      filter.platforms.clear();
+      filter.models.clear();
+      if (action === "select-all") {
+        opts.data.forEach(d => {
+          filter.platforms.add(d[opts.platformField]);
+          filter.models.add(d[opts.modelField]);
+        });
+      }
+      rebuildFilterCard(opts);
+      renderAll();
+    });
+  });
+
+  // Quick filter chips (realtime, batch) — legacy, retained for back-compat
+  card.querySelectorAll("[data-quick]").forEach(btn => {
+    btn.addEventListener("click", e => {
+      const filter = state.filters[opts.filterKey];
+      const quick = btn.dataset.quick;
+      filter.platforms.clear();
+      filter.models.clear();
+      if (quick === "realtime") {
+        opts.data.filter(d => d.latency === "Realtime" || d.mode === "Realtime" || (d.latency && d.latency.startsWith("Realtime")))
+          .forEach(d => { filter.platforms.add(d[opts.platformField]); filter.models.add(d[opts.modelField]); });
+      } else if (quick === "batch") {
+        opts.data.filter(d => (d.latency && (d.latency === "Async" || d.latency.startsWith("Async"))) || d.mode === "Batch")
+          .forEach(d => { filter.platforms.add(d[opts.platformField]); filter.models.add(d[opts.modelField]); });
+      }
+      rebuildFilterCard(opts);
+      renderAll();
+    });
+  });
+
+  // Mode toggle buttons (Realtime / Batch / Both) — sets state._modeToggle[filterKey]
+  card.querySelectorAll(".mode-btn").forEach(btn => {
+    btn.addEventListener("click", e => {
+      const filterKey = btn.dataset.filter;
+      const mode = btn.dataset.mode;
+      state._modeToggle = state._modeToggle || {};
+      state._modeToggle[filterKey] = mode;
+      rebuildFilterCard(opts);
+      renderAll();
+    });
+  });
+}
+
+function rebuildFilterCard(opts) {
+  const card = $(opts.cardId);
+  if (!card) return;
+  buildFilterCard(card, opts);
+  bindFilterEvents(card, opts);
+}
+
+const filterConfigs = {
+  stt: {
+    cardId: "sttFilterCard",
+    filterKey: "stt",
+    data: STT_DATA,
+    platformField: "platform",
+    modelField: "id",
+    platformLabel: "STT Platforms & Models",
+    modelDisplay: d => d.model_name,
+    showModeToggle: true
+  },
+  llm: {
+    cardId: "llmFilterCard",
+    filterKey: "llm",
+    data: LLM_DATA,
+    platformField: "provider",
+    modelField: "id",
+    platformLabel: "LLM Providers & Models",
+    modelDisplay: d => d.model_name
+  },
+  tts: {
+    cardId: "ttsFilterCard",
+    filterKey: "tts",
+    data: TTS_DATA,
+    platformField: "platform",
+    modelField: "id",
+    platformLabel: "TTS Platforms & Models",
+    modelDisplay: d => d.model_name
+  }
+};
+
+
+// ====== app2.js ======
+// =======================
+// VIEW-MODE HELPERS (monthly | annual | both)
+// =======================
+
+// Chart color palette — used consistently across all charts
+const CHART_COLOR_REALTIME = "#336699";   // blue
+const CHART_COLOR_BATCH    = "#FFE600";   // yellow
+const CHART_COLOR_STT_SEG  = "#336699";   // blue (stacked chart)
+const CHART_COLOR_LLM_SEG  = "#FFE600";   // yellow
+const CHART_COLOR_TTS_SEG  = "#FF810A";   // orange
+const LABEL_COLOR_CHEAPEST = "#2D7A3D";   // subtle forest green
+const LABEL_COLOR_EXPENSIVE = "#A33A3A";  // subtle brick red
+
+// Chart.js plugin: draw cheapest (green bold) + most expensive (red bold) labels on top of bars
+const minMaxLabelPlugin = {
+  id: "minMaxLabel",
+  afterDatasetsDraw(chart) {
+    const { ctx, data, chartArea } = chart;
+    if (!chartArea) return;
+    const isStacked = (chart.options.scales?.x?.stacked === true) || (chart.options.scales?.y?.stacked === true);
+    const isHorizontal = chart.options.indexAxis === "y";
+
+    // Get total per bar (sums all dataset values for that bar — handles stacked too)
+    const n = data.labels.length;
+    if (n === 0) return;
+    const totals = new Array(n).fill(0);
+    data.datasets.forEach(ds => {
+      ds.data.forEach((v, i) => { totals[i] += (v || 0); });
+    });
+
+    // Find min and max indices
+    let minIdx = 0, maxIdx = 0;
+    for (let i = 1; i < n; i++) {
+      if (totals[i] < totals[minIdx]) minIdx = i;
+      if (totals[i] > totals[maxIdx]) maxIdx = i;
+    }
+    if (minIdx === maxIdx) return; // only one bar
+
+    // Format helper
+    const fmt = v => {
+      if (state.currency === "INR") return "₹" + Math.round(v).toLocaleString("en-IN");
+      return "$" + Math.round(v).toLocaleString("en-US");
+    };
+
+    ctx.save();
+    ctx.font = "bold 11px 'JetBrains Mono', monospace";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "bottom";
+
+    [
+      { idx: minIdx, color: LABEL_COLOR_CHEAPEST, total: totals[minIdx] },
+      { idx: maxIdx, color: LABEL_COLOR_EXPENSIVE, total: totals[maxIdx] }
+    ].forEach(({ idx, color, total }) => {
+      // Find the topmost (or rightmost for horizontal) drawn pixel for this bar across all datasets
+      let labelX, labelY;
+      if (isHorizontal) {
+        // Horizontal bars: label goes to the right of the bar end
+        let maxX = -Infinity;
+        chart.data.datasets.forEach((ds, dsIdx) => {
+          const meta = chart.getDatasetMeta(dsIdx);
+          const bar = meta.data[idx];
+          if (bar) {
+            const x = isStacked ? bar.x : bar.x;
+            if (x > maxX) maxX = x;
+          }
+        });
+        const meta0 = chart.getDatasetMeta(0);
+        const bar0 = meta0.data[idx];
+        if (!bar0) return;
+        labelX = maxX + 6;
+        labelY = bar0.y;
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+      } else {
+        // Vertical bars: label goes above the bar top
+        let minY = Infinity;
+        chart.data.datasets.forEach((ds, dsIdx) => {
+          const meta = chart.getDatasetMeta(dsIdx);
+          const bar = meta.data[idx];
+          if (bar) {
+            const y = isStacked ? bar.y : bar.y;
+            if (y < minY) minY = y;
+          }
+        });
+        const meta0 = chart.getDatasetMeta(0);
+        const bar0 = meta0.data[idx];
+        if (!bar0) return;
+        labelX = bar0.x;
+        labelY = minY - 4;
+      }
+
+      ctx.fillStyle = color;
+      ctx.fillText(fmt(total), labelX, labelY);
+    });
+
+    ctx.restore();
+  }
+};
+
+function viewCols(label) {
+  // Returns the header HTML for cost columns based on state.view
+  if (state.view === "monthly") return `<th class="cell-num">${label || "Monthly"}</th>`;
+  if (state.view === "annual")  return `<th class="cell-num">${label ? label.replace("Monthly","Annual") : "Annual"}</th>`;
+  return `<th class="cell-num">${label || "Monthly"}</th><th class="cell-num">${label ? label.replace("Monthly","Annual") : "Annual"}</th>`;
+}
+function viewCells(monthlyVal, opts={}) {
+  // Returns the <td> cells for cost values based on state.view. monthlyVal is INR/mo (or null)
+  const m = monthlyVal;
+  const a = (m === null || m === undefined) ? null : m * 12;
+  const fmtFn = opts.formatter || fmt;
+  const bold = opts.bold ? "cell-bold" : "";
+  const cellM = `<td class="cell-num ${bold}">${m === null || m === undefined ? "—" : fmtFn(m)}</td>`;
+  const cellA = `<td class="cell-num ${bold}">${a === null || a === undefined ? "—" : fmtFn(a)}</td>`;
+  if (state.view === "monthly") return cellM;
+  if (state.view === "annual")  return cellA;
+  return cellM + cellA;
+}
+function viewColspan() { return state.view === "both" ? 2 : 1; }
+
+// =======================
+// RENDERING — STT TAB
+// =======================
+function renderSTT() {
+  const data = filteredSTT("stt");
+  const hours = audioHours();
+  
+  // metrics
+  $("sttMetrics").innerHTML = `
+    <div class="metric"><span class="metric-label">Audio Hours / Month</span><span class="metric-value">${hours.toLocaleString("en-IN", {maximumFractionDigits:0})} hrs</span></div>
+    <div class="metric"><span class="metric-label">Number of Calls</span><span class="metric-value">${numCalls().toLocaleString("en-IN")}</span></div>
+    ${state.diarization ? '<div class="metric"><span class="metric-label">Diarization</span><span class="metric-value" style="color:var(--orange);">ON</span></div>' : ''}
+  `;
+  
+  // table
+  const rows = data.map(s => ({
+    ...s,
+    monthly: sttMonthlyINR(s),
+    rate_inr: getDiarizationRate(s)
+  })).sort((a,b) => a.monthly - b.monthly);
+  
+  const cheapest = rows.length ? rows[0].id : null;
+  const totalCols = 4 + viewColspan() + 1; // platform, model, mode, rate + cost cols + latency
+  
+  const head = `<tr>
+    <th>Platform</th><th>Model</th><th>Mode</th>
+    <th class="cell-num">Rate / hr</th>
+    ${viewCols()}
+    <th>Latency</th>
+  </tr>`;
+  
+  const body = rows.length === 0 ? `<tr><td colspan="${totalCols}" style="text-align:center;color:var(--grey-500);padding:30px;">No models match your filters</td></tr>`
+    : rows.map(s => {
+      const isCheapest = s.id === cheapest;
+      const badges = [];
+      if (isCheapest) badges.push('<span class="badge badge-green">💰 Cheapest</span>');
+      if (s.latency === "Realtime") badges.push('<span class="badge badge-blue">⚡ Realtime</span>');
+      if (s.platform === "Sarvam AI" || s.platform === "Bhashini") badges.push('<span class="badge badge-yellow">🇮🇳</span>');
+      return `<tr class="${isCheapest ? 'cheapest':''}">
+        <td><strong>${s.platform}</strong></td>
+        <td>${s.model_name} ${badges.join("")}</td>
+        <td><span class="cell-mono">${s.mode}</span></td>
+        <td class="cell-num">${fmtRate(s.rate_inr)}</td>
+        ${viewCells(s.monthly, {bold:true})}
+        <td><span class="cell-mono">${s.latency}</span></td>
+      </tr>`;
+    }).join("");
+  
+  $("sttTable").querySelector("thead").innerHTML = head;
+  $("sttTable").querySelector("tbody").innerHTML = body;
+  
+  // chart
+  renderSttChart(rows, cheapest);
+}
+
+function renderSttChart(rows, cheapest) {
+  if (state.charts.stt) state.charts.stt.destroy();
+  const ctx = $("sttChart").getContext("2d");
+  state.charts.stt = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels: rows.map(r => `${r.platform} · ${r.model_name}`),
+      datasets: [{
+        label: state.currency === "INR" ? "Monthly Cost (₹)" : "Monthly Cost ($)",
+        data: rows.map(r => state.currency === "INR" ? r.monthly : r.monthly / state.fx),
+        backgroundColor: rows.map(r => (r.mode === "Realtime" || r.latency === "Realtime") ? CHART_COLOR_REALTIME : CHART_COLOR_BATCH),
+        borderColor: "#2E2E38",
+        borderWidth: 1,
+      }]
+    },
+    options: chartOpts("Monthly Cost"),
+    plugins: [minMaxLabelPlugin]
+  });
+}
+
+// =======================
+// LLM TAB
+// =======================
+function renderLLM() {
+  const data = filteredLLM();
+  
+  // token derivation
+  const calls = numCalls();
+  const transcript = state.transcriptTokens * calls;
+  const sysT = state.sysTokens * calls;
+  const kb = state.kbTokens * calls;
+  const inTok = transcript + sysT + kb;
+  const outTok = state.outTokens * calls;
+  
+  $("tokenDerivation").innerHTML = `
+<div>Transcript:    ${state.transcriptTokens.toLocaleString("en-IN")} × ${calls.toLocaleString("en-IN")} calls = ${transcript.toLocaleString("en-IN")}</div>
+<div>System Prompt: ${state.sysTokens.toLocaleString("en-IN")} × ${calls.toLocaleString("en-IN")} calls = ${sysT.toLocaleString("en-IN")}</div>
+<div>KB / Context:    ${state.kbTokens.toLocaleString("en-IN")} × ${calls.toLocaleString("en-IN")} calls = ${kb.toLocaleString("en-IN")}</div>
+<div class="total">TOTAL INPUT:  ${inTok.toLocaleString("en-IN")} tokens</div>
+<div class="total">TOTAL OUTPUT: ${state.outTokens.toLocaleString("en-IN")} × ${calls.toLocaleString("en-IN")} = ${outTok.toLocaleString("en-IN")} tokens</div>
+  `;
+  
+  const rows = data.map(l => ({
+    ...l,
+    inCost: llmInputCostINR(l),
+    outCost: llmOutputCostINR(l),
+    monthly: llmMonthlyINR(l)
+  }));
+  
+  // sort: nulls last
+  rows.sort((a,b) => {
+    if (a.monthly === null) return 1;
+    if (b.monthly === null) return -1;
+    return a.monthly - b.monthly;
+  });
+  
+  const cheapest = rows.find(r => r.monthly !== null);
+  const totalCols = 4 + viewColspan(); // model, provider, in, out + cost cols
+  
+  const head = `<tr>
+    <th>Model</th><th>Provider</th>
+    <th class="cell-num">Input Cost</th>
+    <th class="cell-num">Output Cost</th>
+    ${viewCols()}
+  </tr>`;
+  
+  const body = rows.length === 0 ? `<tr><td colspan="${totalCols}" style="text-align:center;color:var(--grey-500);padding:30px;">No models match your filters</td></tr>`
+    : rows.map(l => {
+      const isCheapest = cheapest && l.id === cheapest.id;
+      const badges = [];
+      if (isCheapest) badges.push('<span class="badge badge-green">💰 Cheapest</span>');
+      const cls = isCheapest ? "cheapest" : "";
+      return `<tr class="${cls}">
+        <td><strong>${l.model_name}</strong> ${badges.join("")}</td>
+        <td>${l.provider}</td>
+        <td class="cell-num">${l.inCost === null ? "—" : fmt(l.inCost)}</td>
+        <td class="cell-num">${l.outCost === null ? "—" : fmt(l.outCost)}</td>
+        ${l.monthly === null ? `<td class="cell-num" colspan="${viewColspan()}" style="font-style:italic;color:var(--grey-500);">Contact for pricing</td>` : viewCells(l.monthly, {bold:true})}
+      </tr>`;
+    }).join("");
+  
+  $("llmTable").querySelector("thead").innerHTML = head;
+  $("llmTable").querySelector("tbody").innerHTML = body;
+  
+  renderLlmChart(rows.filter(r => r.monthly !== null), cheapest);
+}
+
+function renderLlmChart(rows, cheapest) {
+  if (state.charts.llm) state.charts.llm.destroy();
+  const ctx = $("llmChart").getContext("2d");
+  state.charts.llm = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels: rows.map(r => r.model_name),
+      datasets: [{
+        label: state.currency === "INR" ? "Monthly Cost (₹)" : "Monthly Cost ($)",
+        data: rows.map(r => state.currency === "INR" ? r.monthly : r.monthly / state.fx),
+        backgroundColor: rows.map(() => CHART_COLOR_BATCH),
+        borderColor: "#2E2E38",
+        borderWidth: 1,
+      }]
+    },
+    options: { ...chartOpts("Monthly Cost"), indexAxis: "y" },
+    plugins: [minMaxLabelPlugin]
+  });
+}
+
+// =======================
+// TTS TAB
+// =======================
+function renderTTS() {
+  const data = filteredTTS("tts");
+  const chars = totalTtsChars();
+  
+  $("ttsMetrics").innerHTML = `
+    <div class="metric"><span class="metric-label">Chars / Response</span><span class="metric-value">${state.ttsChars}</span></div>
+    <div class="metric"><span class="metric-label">Total Chars / Month</span><span class="metric-value">${chars.toLocaleString("en-IN")}</span></div>
+  `;
+  
+  const rows = data.map(t => ({
+    ...t,
+    monthly: ttsMonthlyINR(t),
+    rate_inr: t.rate_usd_per_1m_chars * state.fx
+  })).sort((a,b) => a.monthly - b.monthly);
+  
+  const cheapest = rows.length ? rows[0].id : null;
+  const totalCols = 4 + viewColspan();
+  
+  const head = `<tr>
+    <th>Platform</th><th>Model</th><th>Tier</th>
+    <th class="cell-num">Rate / 1M chars</th>
+    ${viewCols()}
+  </tr>`;
+  
+  const body = rows.length === 0 ? `<tr><td colspan="${totalCols}" style="text-align:center;color:var(--grey-500);padding:30px;">No models match your filters</td></tr>`
+    : rows.map(t => {
+      const isCheapest = t.id === cheapest;
+      const badges = [];
+      if (isCheapest) badges.push('<span class="badge badge-green">💰 Cheapest</span>');
+      if (t.platform === "Sarvam AI" || t.platform === "Bhashini") badges.push('<span class="badge badge-yellow">🇮🇳</span>');
+      return `<tr class="${isCheapest ? 'cheapest':''}">
+        <td><strong>${t.platform}</strong></td>
+        <td>${t.model_name} ${badges.join("")}</td>
+        <td><span class="cell-mono">${t.tier}</span></td>
+        <td class="cell-num">${fmtRate(t.rate_inr)}</td>
+        ${viewCells(t.monthly, {bold:true})}
+      </tr>`;
+    }).join("");
+  
+  $("ttsTable").querySelector("thead").innerHTML = head;
+  $("ttsTable").querySelector("tbody").innerHTML = body;
+  
+  renderTtsChart(rows, cheapest);
+}
+
+function renderTtsChart(rows, cheapest) {
+  if (state.charts.tts) state.charts.tts.destroy();
+  const ctx = $("ttsChart").getContext("2d");
+  state.charts.tts = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels: rows.map(r => `${r.platform} · ${r.model_name}`),
+      datasets: [{
+        label: state.currency === "INR" ? "Monthly Cost (₹)" : "Monthly Cost ($)",
+        data: rows.map(r => state.currency === "INR" ? r.monthly : r.monthly / state.fx),
+        backgroundColor: rows.map(() => CHART_COLOR_BATCH),
+        borderColor: "#2E2E38",
+        borderWidth: 1,
+      }]
+    },
+    options: chartOpts("Monthly Cost"),
+    plugins: [minMaxLabelPlugin]
+  });
+}
+
+// =======================
+// COMBINED TAB (3D: STT × LLM × TTS)
+// =======================
+function buildCombinedRows() {
+  const comp = state.components;
+  const includeStt = comp !== "llm" && comp !== "tts" && comp !== "llm_tts";
+  const includeLlm = comp !== "stt" && comp !== "tts" && comp !== "stt_tts";
+  const includeTts = comp !== "stt" && comp !== "llm" && comp !== "stt_llm";
+
+  const sttList = includeStt ? filteredSTT("combined_stt") : [{id:"-", platform:"—", model_name:"—"}];
+  const llmList = includeLlm ? filteredLLM("combined_llm").filter(l => l.input_per_1m_usd !== null) : [{id:"-", model_name:"—", provider:"—", input_per_1m_usd:0, output_per_1m_usd:0}];
+  const ttsList = includeTts ? filteredTTS("combined_tts") : [{id:"-", platform:"—", model_name:"—"}];
+
+  const rows = [];
+  sttList.forEach(s => {
+    llmList.forEach(l => {
+      ttsList.forEach(t => {
+        const sCost = includeStt ? sttMonthlyINR(s) : 0;
+        const lCost = includeLlm ? (llmMonthlyINR(l) || 0) : 0;
+        const tCost = includeTts ? ttsMonthlyINR(t) : 0;
+        const total = sCost + lCost + tCost;
+        const latency = includeStt ? s.latency : "—";
+
+        rows.push({
+          stt: includeStt ? s : null,
+          llm: includeLlm ? l : null,
+          tts: includeTts ? t : null,
+          sCost, lCost, tCost, total, latency,
+          includeStt, includeLlm, includeTts
+        });
+      });
+    });
+  });
+
+  // sort
+  if (state.sort === "stt") rows.sort((a,b) => a.sCost - b.sCost);
+  else if (state.sort === "llm") rows.sort((a,b) => a.lCost - b.lCost);
+  else if (state.sort === "tts") rows.sort((a,b) => a.tCost - b.tCost);
+  else rows.sort((a,b) => a.total - b.total);
+
+  return rows;
+}
+
+function renderCombined() {
+  // Show/hide the STT/LLM/TTS filter blocks based on Components radio
+  // (their state persists in memory — if user toggles back, prior selections are restored)
+  const comp = state.components;
+  const showStt = comp !== "llm" && comp !== "tts" && comp !== "llm_tts";
+  const showLlm = comp !== "stt" && comp !== "tts" && comp !== "stt_tts";
+  const showTts = comp !== "stt" && comp !== "llm" && comp !== "stt_llm";
+  const sttBlock = $("combinedSttBlock");
+  const llmBlock = $("combinedLlmBlock");
+  const ttsBlock = $("combinedTtsBlock");
+  if (sttBlock) sttBlock.style.display = showStt ? "" : "none";
+  if (llmBlock) llmBlock.style.display = showLlm ? "" : "none";
+  if (ttsBlock) ttsBlock.style.display = showTts ? "" : "none";
+
+  const rows = buildCombinedRows();
+
+  const includeStt = rows[0]?.includeStt ?? true;
+  const includeLlm = rows[0]?.includeLlm ?? true;
+  const includeTts = rows[0]?.includeTts ?? true;
+
+  // build header dynamically
+  let headCols = ['<th style="width:36px;">#</th>'];
+  if (includeStt) headCols.push("<th>STT</th>");
+  if (includeLlm) headCols.push("<th>LLM</th>");
+  if (includeTts) headCols.push("<th>TTS</th>");
+  if (includeStt) headCols.push('<th class="cell-num">STT Cost</th>');
+  if (includeLlm) headCols.push('<th class="cell-num">LLM Cost</th>');
+  if (includeTts) headCols.push('<th class="cell-num">TTS Cost</th>');
+  const compCount = [includeStt, includeLlm, includeTts].filter(Boolean).length;
+  const totalLabel = compCount === 3 ? "Total" : compCount > 1 ? "Subtotal" : "Cost";
+  headCols.push(viewCols(`Monthly ${totalLabel}`));
+  headCols.push("<th>Latency</th>");
+
+  $("combinedTable").querySelector("thead").innerHTML = `<tr>${headCols.join("")}</tr>`;
+
+  // dedupe when components are excluded
+  let uniqueRows = rows;
+  if (!includeStt && !includeLlm && !includeTts) {
+    uniqueRows = [];
+  } else if (compCount === 1) {
+    const seen = new Set();
+    const keyFn = includeStt ? r => r.stt.id : includeLlm ? r => r.llm.id : r => r.tts.id;
+    uniqueRows = rows.filter(r => { const k = keyFn(r); if (seen.has(k)) return false; seen.add(k); return true; });
+  } else if (compCount === 2) {
+    const seen = new Set();
+    const keyFn = !includeStt ? r => `${r.llm.id}|${r.tts.id}` :
+                  !includeLlm ? r => `${r.stt.id}|${r.tts.id}` :
+                                r => `${r.stt.id}|${r.llm.id}`;
+    uniqueRows = rows.filter(r => { const k = keyFn(r); if (seen.has(k)) return false; seen.add(k); return true; });
+  }
+
+  // limit to 100 for performance (with full 3D, all-selected can be 16*8*13 = 1664 rows)
+  const totalAvail = uniqueRows.length;
+  uniqueRows = uniqueRows.slice(0, 100);
+
+  const cheapest = uniqueRows[0];
+  const colsTotal = headCols.length;
+
+  const body = uniqueRows.length === 0 ? `<tr><td colspan="${colsTotal}" style="text-align:center;color:var(--grey-500);padding:30px;">No combinations match your filters</td></tr>`
+    : uniqueRows.map((r, i) => {
+      const isCheapest = r === cheapest;
+      const badges = [];
+      if (isCheapest) badges.push('<span class="badge badge-green">💰</span>');
+      if (r.stt && (r.stt.platform === "Sarvam AI" || r.stt.platform === "Bhashini") &&
+          r.tts && (r.tts.platform === "Sarvam AI" || r.tts.platform === "Bhashini")) {
+        badges.push('<span class="badge badge-yellow">🇮🇳</span>');
+      }
+      if (r.stt && r.stt.platform === "Bhashini" && r.tts && r.tts.platform === "Bhashini") {
+        badges.push('<span class="badge badge-grey">🆓</span>');
+      }
+      if (r.stt && r.stt.latency === "Realtime") {
+        badges.push('<span class="badge badge-blue">⚡</span>');
+      }
+
+      let cells = [`<td><strong>${i+1}</strong> ${badges.join("")}</td>`];
+      if (includeStt) cells.push(`<td>${r.stt.platform} · ${r.stt.model_name}</td>`);
+      if (includeLlm) cells.push(`<td>${r.llm ? r.llm.model_name : "—"}</td>`);
+      if (includeTts) cells.push(`<td>${r.tts.platform} · ${r.tts.model_name}</td>`);
+      if (includeStt) cells.push(`<td class="cell-num">${fmt(r.sCost)}</td>`);
+      if (includeLlm) cells.push(`<td class="cell-num">${r.llm && r.llm.input_per_1m_usd !== null ? fmt(r.lCost) : "—"}</td>`);
+      if (includeTts) cells.push(`<td class="cell-num">${fmt(r.tCost)}</td>`);
+      cells.push(viewCells(r.total, {bold:true}));
+      cells.push(`<td><span class="cell-mono">${r.latency}</span></td>`);
+
+      return `<tr class="${isCheapest ? 'cheapest':''}">${cells.join("")}</tr>`;
+    }).join("");
+
+  $("combinedTable").querySelector("tbody").innerHTML = body;
+
+  // Show truncation notice if applicable
+  if (totalAvail > 100) {
+    const tbody = $("combinedTable").querySelector("tbody");
+    tbody.insertAdjacentHTML("beforeend", `<tr><td colspan="${colsTotal}" style="text-align:center;color:var(--grey-500);padding:14px;font-style:italic;">Showing top 100 of ${totalAvail.toLocaleString("en-IN")} combinations. Narrow filters for more focused results.</td></tr>`);
+  }
+
+  // chart
+  const compNames = [includeStt && "STT", includeLlm && "LLM", includeTts && "TTS"].filter(Boolean).join(" + ");
+  const viewLabel = state.view === "annual" ? "Annual" : state.view === "monthly" ? "Monthly" : "Monthly";
+  $("combinedChartTitle").textContent = `${compNames} Cost Comparison · top 20 (${viewLabel})`;
+
+  renderCombinedChart(uniqueRows.slice(0, 20), cheapest, includeStt, includeLlm, includeTts);
+}
+
+function renderCombinedChart(rows, cheapest, includeStt, includeLlm, includeTts) {
+  if (state.charts.combined) state.charts.combined.destroy();
+  const ctx = $("combinedChart").getContext("2d");
+  const mult = state.view === "annual" ? 12 : 1;  // both => use monthly for chart
+  const curMult = state.currency === "INR" ? 1 : (1/state.fx);
+
+  const labels = rows.map((r,i) => {
+    const parts = [];
+    if (includeStt) parts.push(r.stt.platform);
+    if (includeLlm && !includeStt) parts.push(r.llm.model_name);
+    if (includeTts) parts.push(r.tts.platform);
+    return `${i+1}. ${parts.join(" + ")}`;
+  });
+
+  const datasets = [];
+  if (includeStt) datasets.push({ label: "STT", data: rows.map(r => r.sCost * mult * curMult), backgroundColor: "#336699" });
+  if (includeLlm) datasets.push({ label: "LLM", data: rows.map(r => r.lCost * mult * curMult), backgroundColor: "#FFE600" });
+  if (includeTts) datasets.push({ label: "TTS", data: rows.map(r => r.tCost * mult * curMult), backgroundColor: "#FF810A" });
+
+  state.charts.combined = new Chart(ctx, {
+    type: "bar",
+    data: { labels, datasets },
+    options: {
+      ...chartOpts("Cost"),
+      scales: {
+        x: { stacked: true, grid: { display: false }, ticks: { color: "#4A4A55", font: { size: 10 } } },
+        y: { stacked: true, grid: { color: "#F0F0F2" }, ticks: { color: "#4A4A55", callback: v => state.currency === "INR" ? "₹" + (v/1000).toFixed(0) + "k" : "$" + v.toFixed(0) } }
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: "#2E2E38", titleColor: "#FFE600", bodyColor: "#FFFFFF", padding: 12,
+          callbacks: {
+            label: ctx => `${ctx.dataset.label}: ${state.currency === "INR" ? "₹" : "$"}${Math.round(ctx.parsed.y).toLocaleString(state.currency === "INR" ? "en-IN" : "en-US")}`
+          }
+        }
+      }
+    },
+    plugins: [minMaxLabelPlugin]
+  });
+}
+
+// =======================
+// CHART OPTIONS
+// =======================
+function chartOpts(yLabel) {
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: "#2E2E38",
+        titleColor: "#FFE600",
+        bodyColor: "#FFFFFF",
+        padding: 12,
+        callbacks: {
+          label: ctx => `${state.currency === "INR" ? "₹" : "$"}${Math.round(ctx.parsed.y || ctx.parsed.x).toLocaleString(state.currency === "INR" ? "en-IN" : "en-US")}`
+        }
+      }
+    },
+    scales: {
+      x: { grid: { display: false }, ticks: { color: "#4A4A55", font: { size: 10 }, maxRotation: 45, minRotation: 30 } },
+      y: { grid: { color: "#F0F0F2" }, ticks: { color: "#4A4A55", callback: v => state.currency === "INR" ? "₹" + (v/1000).toFixed(0) + "k" : "$" + v.toFixed(0) } }
+    }
+  };
+}
+
+// =======================
+// SCENARIO SUMMARY (left panel)
+// =======================
+function renderScenarioSummary() {
+  const el = $("scenarioSummary");
+  if (!el) return;
+  const hours = audioHours();
+  const calls = numCalls();
+  const callsTxt = calls.toLocaleString("en-IN");
+  const hoursTxt = hours.toLocaleString("en-IN", {maximumFractionDigits: 0});
+  const chars = (state.ttsChars * calls).toLocaleString("en-IN");
+  const tokens = ((state.transcriptTokens + state.sysTokens + state.kbTokens + state.outTokens) * calls).toLocaleString("en-IN");
+  if (state.mode === "calls") {
+    el.innerHTML = `<strong>${callsTxt}</strong> calls × <strong>${state.duration}</strong> min/call<br>= <strong>${hoursTxt}</strong> audio hours, <strong>${tokens}</strong> tokens, <strong>${chars}</strong> TTS chars / month`;
+  } else {
+    el.innerHTML = `<strong>${hoursTxt}</strong> audio hours / month (≈ ${callsTxt} calls @ ${state.duration} min)`;
+  }
+}
+
+// =======================
+// CALCULATION BREAKDOWN (renders the bottom card)
+// Tab-aware: STT/LLM/TTS tabs show top N from that leg, Combined shows top N stacks per Components
+// Defaults skip free providers (Bhashini) so the headline doesn't look broken
+// =======================
+function getBreakdownCount() {
+  const el = $("breakdownCount");
+  return el ? parseInt(el.value, 10) || 1 : 1;
+}
+
+// Filter out free providers from a list (for the "default first-load" breakdown only)
+function filterOutFree(list, isFiltered) {
+  // If user has filtered down (so the result is intentional), respect their choice
+  if (isFiltered) return list;
+  // Otherwise skip $0 providers as default
+  return list.filter(item => {
+    if ("rate_usd_per_hour" in item)         return item.rate_usd_per_hour > 0;
+    if ("rate_usd_per_1m_chars" in item)     return item.rate_usd_per_1m_chars > 0;
+    if ("input_per_1m_usd" in item)          return item.input_per_1m_usd !== null && item.input_per_1m_usd > 0;
+    return true;
+  });
+}
+
+function renderBreakdown() {
+  const el = $("breakdownBody");
+  if (!el) return;
+
+  const activeTab = (document.querySelector(".tab.active") || {}).dataset?.tab || "stt";
+  const n = getBreakdownCount();
+  const hours = audioHours();
+  const calls = numCalls();
+
+  let blocks = [];
+
+  if (activeTab === "stt") {
+    const filtered = filteredSTT("stt");
+    let pool = filtered.map(s => ({...s, monthly: sttMonthlyINR(s)})).sort((a,b) => a.monthly - b.monthly);
+    if (pool.length === 0) {
+      el.innerHTML = `<em style="color:var(--grey-300);">No STT models available with the current filters.</em>`;
+      return;
+    }
+    blocks = pool.slice(0, n).map((s, i) => ({
+      title: `#${i+1} — ${s.platform} · ${s.model_name}`,
+      subtitle: `Monthly Rs ${Math.round(s.monthly).toLocaleString("en-IN")}   ·   Annual Rs ${Math.round(s.monthly * 12).toLocaleString("en-IN")}`,
+      html: renderSttBreakdown(s, hours)
+    }));
+  }
+  else if (activeTab === "llm") {
+    const filtered = filteredLLM("llm");
+    let pool = filtered.filter(l => l.input_per_1m_usd !== null).map(l => ({...l, monthly: llmMonthlyINR(l)})).sort((a,b) => a.monthly - b.monthly);
+    if (pool.length === 0) {
+      el.innerHTML = `<em style="color:var(--grey-300);">No LLMs available with the current filters.</em>`;
+      return;
+    }
+    blocks = pool.slice(0, n).map((l, i) => ({
+      title: `#${i+1} — ${l.model_name} (${l.provider})`,
+      subtitle: `Monthly Rs ${Math.round(l.monthly).toLocaleString("en-IN")}   ·   Annual Rs ${Math.round(l.monthly * 12).toLocaleString("en-IN")}`,
+      html: renderLlmBreakdown(l, calls)
+    }));
+  }
+  else if (activeTab === "tts") {
+    const filtered = filteredTTS("tts");
+    let pool = filtered.map(t => ({...t, monthly: ttsMonthlyINR(t)})).sort((a,b) => a.monthly - b.monthly);
+    if (pool.length === 0) {
+      el.innerHTML = `<em style="color:var(--grey-300);">No TTS models available with the current filters.</em>`;
+      return;
+    }
+    blocks = pool.slice(0, n).map((t, i) => ({
+      title: `#${i+1} — ${t.platform} · ${t.model_name}`,
+      subtitle: `Monthly Rs ${Math.round(t.monthly).toLocaleString("en-IN")}   ·   Annual Rs ${Math.round(t.monthly * 12).toLocaleString("en-IN")}`,
+      html: renderTtsBreakdown(t, calls)
+    }));
+  }
+  else {
+    // combined — top N stacks per Components, sorted by state.sort
+    const comp = state.components;
+    let pool = buildCombinationsLocal(comp);
+    // Apply sort
+    if (state.sort === "stt") pool.sort((a,b) => a.sCost - b.sCost);
+    else if (state.sort === "llm") pool.sort((a,b) => a.lCost - b.lCost);
+    else if (state.sort === "tts") pool.sort((a,b) => a.tCost - b.tCost);
+    else pool.sort((a,b) => a.total - b.total);
+
+    if (pool.length === 0) {
+      el.innerHTML = `<em style="color:var(--grey-300);">No combinations available with the current filters.</em>`;
+      return;
+    }
+    blocks = pool.slice(0, n).map((r, i) => {
+      const legParts = [];
+      if (r.stt) legParts.push(r.stt.platform + " · " + r.stt.model_name);
+      if (r.llm) legParts.push(r.llm.model_name);
+      if (r.tts) legParts.push(r.tts.platform + " · " + r.tts.model_name);
+      return {
+        title: `#${i+1} — ${legParts.join(" + ")}`,
+        subtitle: `Monthly Rs ${Math.round(r.total).toLocaleString("en-IN")}   ·   Annual Rs ${Math.round(r.total * 12).toLocaleString("en-IN")}`,
+        html: renderStackBreakdown(r, hours, calls)
+      };
+    });
+  }
+
+  // Scenario summary header (shared across all blocks)
+  const header = `
+    <div style="margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--grey-700);">
+      <div><span class="label">Volume:</span> <span class="value">${state.mode === "calls" ? calls.toLocaleString("en-IN") + " calls × " + state.duration + " min = " + Math.round(hours).toLocaleString("en-IN") + " hrs" : Math.round(hours).toLocaleString("en-IN") + " hrs"}</span></div>
+      <div><span class="label">FX rate:</span> <span class="value">1 USD = ₹${state.fx}</span></div>
+      <div><span class="label">Diarization:</span> <span class="value" style="color:${state.diarization?"var(--orange)":"var(--grey-300)"};">${state.diarization ? "ON" : "OFF"}</span></div>
+    </div>
+  `;
+
+  el.innerHTML = header + blocks.map(b => `
+    <div class="breakdown-block">
+      <div class="breakdown-block-header">
+        ${b.title}
+        <div class="subtitle">${b.subtitle}</div>
+      </div>
+      ${b.html}
+    </div>
+  `).join("");
+}
+
+// Reusable per-leg renderers (return HTML for the inner content)
+function renderSttBreakdown(s, hours) {
+  const sttRateUsd = s.rate_usd_per_hour + (state.diarization ? s.diarization_flat_usd_per_hr : 0);
+  const sttCost = sttMonthlyINR(s);
+  return `<table>
+    <tr><td>Base rate</td><td>₹${(s.rate_usd_per_hour * state.fx).toFixed(2)} / hr  ($${s.rate_usd_per_hour.toFixed(4)})</td></tr>
+    ${state.diarization && s.diarization_flat_usd_per_hr > 0 ? `<tr><td>+ Diarization add-on</td><td>₹${(s.diarization_flat_usd_per_hr * state.fx).toFixed(2)} / hr</td></tr>` : ""}
+    <tr><td>Effective rate</td><td>₹${(sttRateUsd * state.fx).toFixed(2)} / hr</td></tr>
+    <tr><td>× Audio hours</td><td>${Math.round(hours).toLocaleString("en-IN")} hrs</td></tr>
+    <tr class="total-row"><td>STT monthly</td><td>₹${Math.round(sttCost).toLocaleString("en-IN")}</td></tr>
+  </table>`;
+}
+
+function renderLlmBreakdown(l, calls) {
+  const inTok = totalInputTokens();
+  const outTok = totalOutputTokens();
+  const llmInCost = llmInputCostINR(l);
+  const llmOutCost = llmOutputCostINR(l);
+  const llmCost = llmMonthlyINR(l);
+  return `<table>
+    <tr><td>Input tokens / call</td><td>${(state.transcriptTokens + state.sysTokens + state.kbTokens).toLocaleString("en-IN")} (transcript ${state.transcriptTokens} + system ${state.sysTokens} + KB ${state.kbTokens})</td></tr>
+    <tr><td>Output tokens / call</td><td>${state.outTokens.toLocaleString("en-IN")}</td></tr>
+    <tr><td>Total input × ${calls.toLocaleString("en-IN")} calls</td><td>${inTok.toLocaleString("en-IN")} tokens</td></tr>
+    <tr><td>Total output × ${calls.toLocaleString("en-IN")} calls</td><td>${outTok.toLocaleString("en-IN")} tokens</td></tr>
+    <tr><td>Input cost @ ₹${(l.input_per_1m_usd * state.fx).toFixed(2)}/1M</td><td>₹${Math.round(llmInCost).toLocaleString("en-IN")}</td></tr>
+    <tr><td>Output cost @ ₹${(l.output_per_1m_usd * state.fx).toFixed(2)}/1M</td><td>₹${Math.round(llmOutCost).toLocaleString("en-IN")}</td></tr>
+    <tr class="total-row"><td>LLM monthly</td><td>₹${Math.round(llmCost).toLocaleString("en-IN")}</td></tr>
+  </table>`;
+}
+
+function renderTtsBreakdown(t, calls) {
+  const chars = totalTtsChars();
+  const ttsCost = ttsMonthlyINR(t);
+  return `<table>
+    <tr><td>Chars / response × ${calls.toLocaleString("en-IN")} calls</td><td>${chars.toLocaleString("en-IN")} chars</td></tr>
+    <tr><td>Rate</td><td>₹${Math.round(t.rate_usd_per_1m_chars * state.fx).toLocaleString("en-IN")} / 1M chars</td></tr>
+    <tr class="total-row"><td>TTS monthly</td><td>₹${Math.round(ttsCost).toLocaleString("en-IN")}</td></tr>
+  </table>`;
+}
+
+function renderStackBreakdown(r, hours, calls) {
+  // Multi-leg: render only the legs that are present (driven by Components)
+  let html = "";
+  if (r.stt) html += `<div style="margin-bottom: 10px;"><strong style="color:var(--yellow);">STT — ${r.stt.platform} · ${r.stt.model_name}</strong>${renderSttBreakdown(r.stt, hours)}</div>`;
+  if (r.llm) html += `<div style="margin-bottom: 10px;"><strong style="color:var(--yellow);">LLM — ${r.llm.model_name} (${r.llm.provider})</strong>${renderLlmBreakdown(r.llm, calls)}</div>`;
+  if (r.tts) html += `<div style="margin-bottom: 10px;"><strong style="color:var(--yellow);">TTS — ${r.tts.platform} · ${r.tts.model_name}</strong>${renderTtsBreakdown(r.tts, calls)}</div>`;
+  html += `<table><tr class="total-row"><td>Stack total monthly</td><td>₹${Math.round(r.total).toLocaleString("en-IN")}</td></tr><tr class="total-row"><td>Stack total annual (× 12)</td><td>₹${Math.round(r.total * 12).toLocaleString("en-IN")}</td></tr></table>`;
+  return html;
+}
+
+// Build combinations using current Combined filters (used by the breakdown render)
+function buildCombinationsLocal(comp) {
+  const includeStt = comp !== "llm" && comp !== "tts" && comp !== "llm_tts";
+  const includeLlm = comp !== "stt" && comp !== "tts" && comp !== "stt_tts";
+  const includeTts = comp !== "stt" && comp !== "llm" && comp !== "stt_llm";
+  const sttList = includeStt ? filteredSTT("combined_stt") : [null];
+  const llmList = includeLlm ? filteredLLM("combined_llm").filter(l => l.input_per_1m_usd !== null) : [null];
+  const ttsList = includeTts ? filteredTTS("combined_tts") : [null];
+  const rows = [];
+  sttList.forEach(s => llmList.forEach(l => ttsList.forEach(t => {
+    const sCost = s ? sttMonthlyINR(s) : 0;
+    const lCost = l ? (llmMonthlyINR(l) || 0) : 0;
+    const tCost = t ? ttsMonthlyINR(t) : 0;
+    rows.push({stt: s, llm: l, tts: t, sCost, lCost, tCost, total: sCost + lCost + tCost});
+  })));
+  return rows;
+}
+
+function buildCombinationsLocalAll(comp) {
+  // Used to detect whether the user has narrowed filters
+  const includeStt = comp !== "llm" && comp !== "tts" && comp !== "llm_tts";
+  const includeLlm = comp !== "stt" && comp !== "tts" && comp !== "stt_tts";
+  const includeTts = comp !== "stt" && comp !== "llm" && comp !== "stt_llm";
+  const sttCount = includeStt ? STT_DATA.length : 1;
+  const llmCount = includeLlm ? LLM_DATA.filter(l => l.input_per_1m_usd !== null).length : 1;
+  const ttsCount = includeTts ? TTS_DATA.length : 1;
+  return { length: sttCount * llmCount * ttsCount };
+}
+
+// =======================
+// RECOMMENDATION CARDS — per-tab, filter-driven
+// =======================
+
+// Helper: format INR amount nicely
+function fmtINR(v) {
+  return "₹" + Math.round(v).toLocaleString("en-IN");
+}
+
+// Card insights (one-liner per card type)
+const CARD_INSIGHTS = {
+  // Stack cards
+  cheapest_batch_stack:    "Lowest-cost stack combo using batch/async STT — best for post-call analytics, IVR transcripts, and async workloads.",
+  cheapest_realtime_stack: "Lowest-cost stack combo using realtime STT — best for live voice agents on a tight budget.",
+  premium_batch_stack:     "Highest-cost batch combo in current selection — typically reflects top-tier accuracy and quality models.",
+  premium_realtime_stack:  "Highest-cost realtime combo — premium models for production-critical voice agents.",
+  // Per-leg cards (STT)
+  cheapest_batch_stt:      "Lowest-cost batch/async STT in current selection — best for archival transcription pipelines.",
+  cheapest_realtime_stt:   "Lowest-cost realtime STT — best for budget voice agents needing live captioning.",
+  premium_batch_stt:       "Highest-cost batch STT — typically the highest-accuracy async model in your filter.",
+  premium_realtime_stt:    "Highest-cost realtime STT — premium streaming for production voice applications.",
+  // Per-leg cards (LLM / TTS)
+  cheapest_llm:            "Lowest-cost LLM at your token volume.",
+  premium_llm:             "Highest-cost LLM — typically the most capable model in your selection.",
+  cheapest_tts:            "Lowest-cost TTS at your character volume.",
+  premium_tts:             "Highest-cost TTS — typically the highest-quality voice model in your selection.",
+};
+
+// Render a stack card (3-leg)
+function renderStackCard(label, cls, combo, insightKey, collisionNote) {
+  if (!combo) return "";
+  return `
+    <div class="rec-card ${cls}">
+      <div class="rec-label">${label}</div>
+      <div class="rec-stack">
+        <div class="rec-row"><span class="rec-leg">STT</span><span class="rec-model">${combo.stt.platform} · ${combo.stt.model_name}</span></div>
+        <div class="rec-row"><span class="rec-leg">LLM</span><span class="rec-model">${combo.llm.model_name}</span></div>
+        <div class="rec-row"><span class="rec-leg">TTS</span><span class="rec-model">${combo.tts.platform} · ${combo.tts.model_name}</span></div>
+      </div>
+      <div class="rec-cost">
+        <div class="rec-cost-block"><span class="rec-cost-label">Monthly</span><span class="rec-cost-val">${fmtINR(combo.total)}</span></div>
+        <div class="rec-cost-block"><span class="rec-cost-label">Annual</span><span class="rec-cost-val">${fmtINR(combo.total * 12)}</span></div>
+      </div>
+      <div class="rec-insight">${collisionNote ? `<em>${collisionNote}</em>` : CARD_INSIGHTS[insightKey]}</div>
+    </div>
+  `;
+}
+
+// Render a single-leg card (STT / LLM / TTS)
+function renderLegCard(label, cls, item, leg, insightKey, collisionNote) {
+  if (!item) return "";
+  const platform = item.platform || item.provider || "—";
+  const modelName = item.model_name;
+  const monthly = item.monthly;
+  return `
+    <div class="rec-card ${cls}">
+      <div class="rec-label">${label}</div>
+      <div class="rec-stack">
+        <div class="rec-row"><span class="rec-leg">${leg.toUpperCase()}</span><span class="rec-model">${platform} · ${modelName}</span></div>
+      </div>
+      <div class="rec-cost">
+        <div class="rec-cost-block"><span class="rec-cost-label">Monthly</span><span class="rec-cost-val">${fmtINR(monthly)}</span></div>
+        <div class="rec-cost-block"><span class="rec-cost-label">Annual</span><span class="rec-cost-val">${fmtINR(monthly * 12)}</span></div>
+      </div>
+      <div class="rec-insight">${collisionNote ? `<em>${collisionNote}</em>` : CARD_INSIGHTS[insightKey]}</div>
+    </div>
+  `;
+}
+
+// Render an empty-state card for batch/realtime when nothing matches
+function renderEmptyCard(label, cls, message) {
+  return `
+    <div class="rec-card ${cls} collision">
+      <div class="rec-label">${label}</div>
+      <div class="rec-collision-note">${message}</div>
+    </div>
+  `;
+}
+
+// =======================
+// COMBINED TAB — 4 stack cards
+// =======================
+function renderCombinedRecCards() {
+  const el = $("combinedRecCards");
+  if (!el) return;
+
+  // Build all combos from current Combined filters
+  const sttPool = filteredSTT("combined_stt");
+  const llmPool = filteredLLM("combined_llm").filter(l => l.input_per_1m_usd !== null);
+  const ttsPool = filteredTTS("combined_tts");
+
+  if (!sttPool.length || !llmPool.length || !ttsPool.length) {
+    el.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:30px;color:var(--grey-500);font-style:italic;">No combinations available — adjust filters.</div>`;
+    el.className = "rec-cards";
+    return;
+  }
+
+  const combos = [];
+  sttPool.forEach(s => llmPool.forEach(l => ttsPool.forEach(t => {
+    combos.push({stt: s, llm: l, tts: t, total: sttMonthlyINR(s) + (llmMonthlyINR(l) || 0) + ttsMonthlyINR(t)});
+  })));
+  combos.sort((a,b) => a.total - b.total);
+
+  const isBatch = c => c.stt.mode === "Batch" || (c.stt.latency && c.stt.latency.startsWith && c.stt.latency.startsWith("Async"));
+  const isRealtime = c => c.stt.mode === "Realtime" || c.stt.latency === "Realtime";
+
+  const batchCombos = combos.filter(isBatch);
+  const realtimeCombos = combos.filter(isRealtime);
+
+  const cheapestBatch = batchCombos[0] || null;
+  const premiumBatch = batchCombos.length ? batchCombos[batchCombos.length - 1] : null;
+  const cheapestRealtime = realtimeCombos[0] || null;
+  const premiumRealtime = realtimeCombos.length ? realtimeCombos[realtimeCombos.length - 1] : null;
+
+  // Collision notes
+  const batchCollision = (cheapestBatch && premiumBatch && cheapestBatch.total === premiumBatch.total)
+    ? "Only one batch combination matches the current filters, so cheapest and premium are the same."
+    : null;
+  const rtCollision = (cheapestRealtime && premiumRealtime && cheapestRealtime.total === premiumRealtime.total)
+    ? "Only one realtime combination matches the current filters, so cheapest and premium are the same."
+    : null;
+
+  let html = "";
+  if (cheapestBatch) html += renderStackCard("Cheapest Stack — Batch", "cheapest-batch", cheapestBatch, "cheapest_batch_stack", null);
+  else html += renderEmptyCard("Cheapest Stack — Batch", "cheapest-batch", "No batch STT in current filter selection.");
+
+  if (cheapestRealtime) html += renderStackCard("Cheapest Stack — Realtime", "cheapest-realtime", cheapestRealtime, "cheapest_realtime_stack", null);
+  else html += renderEmptyCard("Cheapest Stack — Realtime", "cheapest-realtime", "No realtime STT in current filter selection.");
+
+  if (premiumBatch && !batchCollision) html += renderStackCard("Premium Stack — Batch", "premium-batch", premiumBatch, "premium_batch_stack", null);
+  else if (premiumBatch && batchCollision) html += renderEmptyCard("Premium Stack — Batch", "premium-batch", batchCollision);
+  else html += renderEmptyCard("Premium Stack — Batch", "premium-batch", "No batch STT in current filter selection.");
+
+  if (premiumRealtime && !rtCollision) html += renderStackCard("Premium Stack — Realtime", "premium-realtime", premiumRealtime, "premium_realtime_stack", null);
+  else if (premiumRealtime && rtCollision) html += renderEmptyCard("Premium Stack — Realtime", "premium-realtime", rtCollision);
+  else html += renderEmptyCard("Premium Stack — Realtime", "premium-realtime", "No realtime STT in current filter selection.");
+
+  el.innerHTML = html;
+  el.className = "rec-cards cards-4";
+}
+
+// =======================
+// STT TAB — 4 cards (Cheapest/Premium × Batch/Realtime)
+// =======================
+function renderSttRecCards() {
+  const el = $("sttRecCards");
+  if (!el) return;
+
+  const pool = filteredSTT("stt").map(s => ({...s, monthly: sttMonthlyINR(s)})).sort((a,b) => a.monthly - b.monthly);
+  if (!pool.length) {
+    el.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:24px;color:var(--grey-500);font-style:italic;">No STT models match current filters.</div>`;
+    el.className = "rec-cards";
+    return;
+  }
+
+  const batch = pool.filter(s => s.mode === "Batch" || (s.latency && s.latency.startsWith && s.latency.startsWith("Async")));
+  const realtime = pool.filter(s => s.mode === "Realtime" || s.latency === "Realtime");
+
+  const cheapestBatch = batch[0] || null;
+  const premiumBatch = batch.length ? batch[batch.length - 1] : null;
+  const cheapestRT = realtime[0] || null;
+  const premiumRT = realtime.length ? realtime[realtime.length - 1] : null;
+
+  const batchCollision = (cheapestBatch && premiumBatch && cheapestBatch.id === premiumBatch.id)
+    ? "Only one batch STT matches — cheapest and premium are the same."
+    : null;
+  const rtCollision = (cheapestRT && premiumRT && cheapestRT.id === premiumRT.id)
+    ? "Only one realtime STT matches — cheapest and premium are the same."
+    : null;
+
+  let html = "";
+  if (cheapestBatch) html += renderLegCard("Cheapest STT — Batch", "cheapest-batch", cheapestBatch, "STT", "cheapest_batch_stt", null);
+  else html += renderEmptyCard("Cheapest STT — Batch", "cheapest-batch", "No batch STT in current filter selection.");
+
+  if (cheapestRT) html += renderLegCard("Cheapest STT — Realtime", "cheapest-realtime", cheapestRT, "STT", "cheapest_realtime_stt", null);
+  else html += renderEmptyCard("Cheapest STT — Realtime", "cheapest-realtime", "No realtime STT in current filter selection.");
+
+  if (premiumBatch && !batchCollision) html += renderLegCard("Premium STT — Batch", "premium-batch", premiumBatch, "STT", "premium_batch_stt", null);
+  else if (premiumBatch && batchCollision) html += renderEmptyCard("Premium STT — Batch", "premium-batch", batchCollision);
+  else html += renderEmptyCard("Premium STT — Batch", "premium-batch", "No batch STT in current filter selection.");
+
+  if (premiumRT && !rtCollision) html += renderLegCard("Premium STT — Realtime", "premium-realtime", premiumRT, "STT", "premium_realtime_stt", null);
+  else if (premiumRT && rtCollision) html += renderEmptyCard("Premium STT — Realtime", "premium-realtime", rtCollision);
+  else html += renderEmptyCard("Premium STT — Realtime", "premium-realtime", "No realtime STT in current filter selection.");
+
+  el.innerHTML = html;
+  el.className = "rec-cards cards-4";
+}
+
+// =======================
+// LLM TAB — 2 cards (Cheapest / Premium)
+// =======================
+function renderLlmRecCards() {
+  const el = $("llmRecCards");
+  if (!el) return;
+
+  const pool = filteredLLM("llm").filter(l => l.input_per_1m_usd !== null).map(l => ({...l, monthly: llmMonthlyINR(l)})).sort((a,b) => a.monthly - b.monthly);
+  if (!pool.length) {
+    el.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:24px;color:var(--grey-500);font-style:italic;">No LLMs match current filters.</div>`;
+    el.className = "rec-cards";
+    return;
+  }
+
+  const cheapest = pool[0];
+  const premium = pool[pool.length - 1];
+  const collision = (cheapest.id === premium.id)
+    ? "Only one LLM matches — cheapest and premium are the same."
+    : null;
+
+  let html = renderLegCard("Cheapest LLM", "cheapest", cheapest, "LLM", "cheapest_llm", null);
+  if (collision) html += renderEmptyCard("Premium LLM", "premium", collision);
+  else html += renderLegCard("Premium LLM", "premium", premium, "LLM", "premium_llm", null);
+
+  el.innerHTML = html;
+  el.className = "rec-cards";
+}
+
+// =======================
+// TTS TAB — 2 cards (Cheapest / Premium)
+// =======================
+function renderTtsRecCards() {
+  const el = $("ttsRecCards");
+  if (!el) return;
+
+  const pool = filteredTTS("tts").map(t => ({...t, monthly: ttsMonthlyINR(t)})).sort((a,b) => a.monthly - b.monthly);
+  if (!pool.length) {
+    el.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:24px;color:var(--grey-500);font-style:italic;">No TTS models match current filters.</div>`;
+    el.className = "rec-cards";
+    return;
+  }
+
+  const cheapest = pool[0];
+  const premium = pool[pool.length - 1];
+  const collision = (cheapest.id === premium.id)
+    ? "Only one TTS matches — cheapest and premium are the same."
+    : null;
+
+  let html = renderLegCard("Cheapest TTS", "cheapest", cheapest, "TTS", "cheapest_tts", null);
+  if (collision) html += renderEmptyCard("Premium TTS", "premium", collision);
+  else html += renderLegCard("Premium TTS", "premium", premium, "TTS", "premium_tts", null);
+
+  el.innerHTML = html;
+  el.className = "rec-cards";
+}
+
+// Master function — calls all 4
+function renderRecommendations() {
+  renderCombinedRecCards();
+  renderSttRecCards();
+  renderLlmRecCards();
+  renderTtsRecCards();
+}
+
+
+// ====== app3.js ======
+// ===========================================================================
+// EXPORTS MODULE — PDF, Client PDF, Excel, Copy Link
+// ===========================================================================
+// Architecture:
+//   - Each export honors the active tab (STT/LLM/TTS/Combined)
+//   - Scope = "filtered" or "all"
+//   - Stack Comparison gets a rich dialog with section checkboxes
+//   - Top 5 cost breakdowns checkbox available on every dialog
+//   - Excel exports are fully formula-linked (Inputs + Config + price sheets)
+//   - PDFs use EY color palette, neutral branding (Client Report adds optional branding)
+//   - Filenames include tab + scope + date
+//   - Every export carries a generation timestamp in IST
+// ===========================================================================
+
+const EY_YELLOW = "#FFE600";
+const EY_BLACK = "#2E2E38";
+const EY_GREY_BG = "#F8F8FA";
+const EY_GREY_TEXT = "#4A4A55";
+
+// Cache the modal callback (so multiple exports don't clobber each other)
+let _exportCallback = null;
+let _pendingExportType = null;
+let _pendingClientFields = null;
+
+// =========================
+// PUBLIC ENTRY POINTS
+// =========================
+function exportPDF(scope, sections, includeBreakdowns, tab, clientFields) {
+  try {
+    if (!window.jspdf || !window.jspdf.jsPDF) {
+      showToast("PDF library failed to load — check your connection");
+      return;
+    }
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+    if (typeof doc.autoTable !== "function") {
+      showToast("PDF table plugin not loaded");
+      return;
+    }
+    buildPDF(doc, scope, sections, includeBreakdowns, tab, clientFields);
+    const filename = buildFilename(tab, scope, clientFields ? "client-report" : "report", "pdf");
+    doc.save(filename);
+    showToast("PDF downloaded");
+  } catch (err) {
+    console.error("exportPDF error", err);
+    showToast("PDF export failed — check console for details");
+  }
+}
+
+function exportExcel(scope, sections, includeBreakdowns, tab) {
+  try {
+    if (typeof XLSX === "undefined") {
+      showToast("Excel library failed to load — check your connection");
+      return;
+    }
+    const wb = XLSX.utils.book_new();
+    buildExcel(wb, scope, sections, includeBreakdowns, tab);
+    const filename = buildFilename(tab, scope, "report", "xlsx");
+    XLSX.writeFile(wb, filename);
+    showToast("Excel downloaded");
+  } catch (err) {
+    console.error("exportExcel error", err);
+    showToast("Excel export failed — check console for details");
+  }
+}
+
+function copyShareLink() {
+  try {
+    // Build a compact state object
+    const payload = {
+      v: state.volume, d: state.duration, mode: state.mode,
+      cur: state.currency, fx: state.fx, dia: state.diarization ? 1 : 0,
+      llm: state.llmId, view: state.view, comp: state.components, sort: state.sort,
+      tt: state.transcriptTokens, st: state.sysTokens, kt: state.kbTokens,
+      ot: state.outTokens, tc: state.ttsChars,
+      f: {}
+    };
+    // Include filter state for every filter key (only model IDs — platforms are derivable)
+    Object.keys(state.filters).forEach(k => {
+      payload.f[k] = [...state.filters[k].models];
+    });
+    const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+    const url = window.location.origin + window.location.pathname + "?state=" + encoded;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(() => showToast("Link copied to clipboard"), () => fallbackCopy(url));
+    } else {
+      fallbackCopy(url);
+    }
+  } catch (err) {
+    console.error("Copy link error:", err);
+    showToast("Copy link failed");
+  }
+}
+
+function fallbackCopy(text) {
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.style.position = "fixed";
+  ta.style.opacity = "0";
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand("copy"); showToast("Link copied to clipboard"); }
+  catch { showToast("Copy failed — please copy URL manually"); }
+  document.body.removeChild(ta);
+}
+
+function loadFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const encoded = params.get("state");
+  if (!encoded) return;
+  try {
+    const payload = JSON.parse(decodeURIComponent(escape(atob(encoded))));
+    if (payload.v) state.volume = payload.v;
+    if (payload.d) state.duration = payload.d;
+    if (payload.mode) state.mode = payload.mode;
+    if (payload.cur) state.currency = payload.cur;
+    if (payload.fx) state.fx = payload.fx;
+    if (typeof payload.dia !== "undefined") state.diarization = payload.dia === 1;
+    if (payload.llm) state.llmId = payload.llm;
+    if (payload.view) state.view = payload.view;
+    if (payload.comp) state.components = payload.comp;
+    if (payload.sort) state.sort = payload.sort;
+    if (payload.tt) state.transcriptTokens = payload.tt;
+    if (payload.st) state.sysTokens = payload.st;
+    if (payload.kt) state.kbTokens = payload.kt;
+    if (payload.ot) state.outTokens = payload.ot;
+    if (payload.tc) state.ttsChars = payload.tc;
+    if (payload.f) {
+      Object.keys(payload.f).forEach(k => {
+        if (state.filters[k]) {
+          state.filters[k].models = new Set(payload.f[k]);
+          // Derive platforms from models
+          state.filters[k].platforms = new Set();
+          const data = k.includes("llm") ? LLM_DATA : k.includes("stt") ? STT_DATA : TTS_DATA;
+          const pField = k.includes("llm") ? "provider" : "platform";
+          data.forEach(d => {
+            if (state.filters[k].models.has(d.id)) state.filters[k].platforms.add(d[pField]);
+          });
+        }
+      });
+    }
+  } catch (e) { console.warn("Failed to decode share link", e); }
+}
+
+// =========================
+// HELPERS
+// =========================
+function getActiveTab() {
+  const active = document.querySelector(".tab.active");
+  return active ? active.dataset.tab : "stt";
+}
+
+function nowTimestampIST() {
+  const d = new Date();
+  const opts = {
+    year: "numeric", month: "short", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", hour12: false,
+    timeZone: "Asia/Kolkata"
+  };
+  const formatted = new Intl.DateTimeFormat("en-IN", opts).format(d).replace(",", "");
+  return formatted + " IST";
+}
+
+function buildFilename(tab, scope, kind, ext) {
+  const date = new Date();
+  const y = date.getFullYear();
+  const m = String(date.getMonth()+1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const tabLabel = { stt: "STT", llm: "LLM", tts: "TTS", combined: "Stack-Comparison" }[tab] || "Voice-Stack";
+  const scopeLabel = scope === "all" ? "all" : "filtered";
+  return `${tabLabel}_${kind}_${scopeLabel}_${y}-${m}-${day}.${ext}`;
+}
+
+// Format INR for breakdown displays (always INR per user direction)
+function inr(v) {
+  if (v === null || v === undefined || isNaN(v)) return "—";
+  return "Rs " + Math.round(v).toLocaleString("en-IN");
+}
+
+// Format whichever current currency the dashboard is showing (for tables)
+function fmtCur(inrValue) {
+  if (inrValue === null || inrValue === undefined || isNaN(inrValue)) return "—";
+  if (state.currency === "USD") {
+    return "$" + (inrValue / state.fx).toFixed(2);
+  }
+  return "Rs " + Math.round(inrValue).toLocaleString("en-IN");
+}
+
+function getSortedSTT(scope, filterKey) {
+  const list = scope === "all" ? STT_DATA : filteredSTT(filterKey || "stt");
+  return list.map(s => ({...s, monthly: sttMonthlyINR(s), rate_inr_hr: getDiarizationRate(s)}))
+             .sort((a,b) => a.monthly - b.monthly);
+}
+function getSortedLLM(scope, filterKey) {
+  const list = scope === "all" ? LLM_DATA : filteredLLM(filterKey || "llm");
+  return list.map(l => ({...l, monthly: llmMonthlyINR(l)}))
+             .filter(l => l.monthly !== null)
+             .sort((a,b) => a.monthly - b.monthly);
+}
+function getSortedTTS(scope, filterKey) {
+  const list = scope === "all" ? TTS_DATA : filteredTTS(filterKey || "tts");
+  return list.map(t => ({...t, monthly: ttsMonthlyINR(t), rate_inr_chars: t.rate_usd_per_1m_chars * state.fx}))
+             .sort((a,b) => a.monthly - b.monthly);
+}
+
+// Build STT × LLM × TTS combinations honoring scope, sort, and components
+function buildCombinations(scope, components, sortKey, capAt) {
+  const includeStt = components !== "llm" && components !== "tts" && components !== "llm_tts";
+  const includeLlm = components !== "stt" && components !== "tts" && components !== "stt_tts";
+  const includeTts = components !== "stt" && components !== "llm" && components !== "stt_llm";
+  const sttList = scope === "all" ? STT_DATA : filteredSTT("combined_stt");
+  const llmListRaw = scope === "all" ? LLM_DATA.filter(l => l.input_per_1m_usd !== null) : filteredLLM("combined_llm").filter(l => l.input_per_1m_usd !== null);
+  const ttsList = scope === "all" ? TTS_DATA : filteredTTS("combined_tts");
+  const sttPool = includeStt ? sttList : [{id:"-", platform:"—", model_name:"—"}];
+  const llmPool = includeLlm ? llmListRaw : [{id:"-", model_name:"—", provider:"—", input_per_1m_usd:0, output_per_1m_usd:0}];
+  const ttsPool = includeTts ? ttsList : [{id:"-", platform:"—", model_name:"—"}];
+
+  const rows = [];
+  sttPool.forEach(s => llmPool.forEach(l => ttsPool.forEach(t => {
+    const sCost = includeStt ? sttMonthlyINR(s) : 0;
+    const lCost = includeLlm ? (llmMonthlyINR(l) || 0) : 0;
+    const tCost = includeTts ? ttsMonthlyINR(t) : 0;
+    rows.push({
+      stt: includeStt ? s : null, llm: includeLlm ? l : null, tts: includeTts ? t : null,
+      sCost, lCost, tCost, total: sCost + lCost + tCost,
+      includeStt, includeLlm, includeTts
+    });
+  })));
+
+  if (sortKey === "stt") rows.sort((a,b) => a.sCost - b.sCost);
+  else if (sortKey === "llm") rows.sort((a,b) => a.lCost - b.lCost);
+  else if (sortKey === "tts") rows.sort((a,b) => a.tCost - b.tCost);
+  else rows.sort((a,b) => a.total - b.total);
+
+  return capAt ? rows.slice(0, capAt) : rows;
+}
+
+// Build a STT+LLM 2-leg matrix
+function buildPairMatrix(scope, sortKey, capAt, includeStt, includeLlm, includeTts) {
+  // Reduce 3D combinations to unique 2-leg pairs (cheapest TTS slot doesn't matter for pair matrix display, but cost shown is for both legs only)
+  const sttList = scope === "all" ? STT_DATA : filteredSTT("combined_stt");
+  const llmListRaw = scope === "all" ? LLM_DATA.filter(l => l.input_per_1m_usd !== null) : filteredLLM("combined_llm").filter(l => l.input_per_1m_usd !== null);
+  const ttsList = scope === "all" ? TTS_DATA : filteredTTS("combined_tts");
+
+  const rows = [];
+  if (includeStt && includeLlm && !includeTts) {
+    sttList.forEach(s => llmListRaw.forEach(l => {
+      const sCost = sttMonthlyINR(s), lCost = llmMonthlyINR(l) || 0;
+      rows.push({stt: s, llm: l, sCost, lCost, total: sCost + lCost});
+    }));
+  } else if (includeStt && includeTts && !includeLlm) {
+    sttList.forEach(s => ttsList.forEach(t => {
+      const sCost = sttMonthlyINR(s), tCost = ttsMonthlyINR(t);
+      rows.push({stt: s, tts: t, sCost, tCost, total: sCost + tCost});
+    }));
+  } else if (includeLlm && includeTts && !includeStt) {
+    llmListRaw.forEach(l => ttsList.forEach(t => {
+      const lCost = llmMonthlyINR(l) || 0, tCost = ttsMonthlyINR(t);
+      rows.push({llm: l, tts: t, lCost, tCost, total: lCost + tCost});
+    }));
+  }
+
+  // Sort
+  if (sortKey === "stt") rows.sort((a,b) => (a.sCost||0) - (b.sCost||0));
+  else if (sortKey === "llm") rows.sort((a,b) => (a.lCost||0) - (b.lCost||0));
+  else if (sortKey === "tts") rows.sort((a,b) => (a.tCost||0) - (b.tCost||0));
+  else rows.sort((a,b) => a.total - b.total);
+
+  return capAt ? rows.slice(0, capAt) : rows;
+}
+
+function sortLabel(sortKey) {
+  return {total: "Cheapest Overall", stt: "Cheapest STT", llm: "Cheapest LLM", tts: "Cheapest TTS"}[sortKey] || "Cheapest Overall";
+}
+
+function getRecommendedStacks(scope) {
+  // Pools respect user filters; if user includes free providers, they show
+  const sttFiltered = filteredSTT("combined_stt");
+  const llmFilteredRaw = filteredLLM("combined_llm").filter(l => l.input_per_1m_usd !== null);
+  const ttsFiltered = filteredTTS("combined_tts");
+
+  let sttPool = scope === "all" ? STT_DATA : (sttFiltered.length ? sttFiltered : STT_DATA);
+  let llmPoolRaw = scope === "all" ? LLM_DATA.filter(l => l.input_per_1m_usd !== null) : (llmFilteredRaw.length ? llmFilteredRaw : LLM_DATA.filter(l => l.input_per_1m_usd !== null));
+  let ttsPool = scope === "all" ? TTS_DATA : (ttsFiltered.length ? ttsFiltered : TTS_DATA);
+  if (!sttPool.length || !llmPoolRaw.length || !ttsPool.length) return [];
+
+  const combos = [];
+  sttPool.forEach(s => llmPoolRaw.forEach(l => ttsPool.forEach(t => {
+    combos.push({stt:s, llm:l, tts:t, total: sttMonthlyINR(s) + (llmMonthlyINR(l) || 0) + ttsMonthlyINR(t)});
+  })));
+  combos.sort((a,b) => a.total - b.total);
+
+  const cheapest = combos[0];
+  const bestRealtime = combos.find(c => c.stt.mode === "Realtime" || c.stt.latency === "Realtime");
+  const bestBatch = combos.find(c => c.stt.mode === "Batch" || (c.stt.latency && c.stt.latency.startsWith && c.stt.latency.startsWith("Async")));
+
+  const out = [];
+  if (cheapest) out.push({label: "Cheapest Overall", combo: cheapest});
+  if (bestBatch) out.push({label: "Best for Batch / Async", combo: bestBatch});
+  if (bestRealtime) out.push({label: "Best for Real-Time", combo: bestRealtime});
+  return out;
+}
+
+// =========================
+// PDF BUILDER
+// =========================
+function buildPDF(doc, scope, sections, includeBreakdowns, tab, clientFields) {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const margin = 40;
+  let y = margin;
+
+  // ===== COVER / HEADER =====
+  // Yellow accent bar
+  doc.setFillColor(EY_YELLOW);
+  doc.rect(0, 0, pageWidth, 6, "F");
+
+  y = 36;
+
+  if (clientFields) {
+    // Client Report cover branding
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(22);
+    doc.setTextColor(EY_BLACK);
+    doc.text(clientFields.title || "Voice Stack Cost Analysis", margin, y);
+    y += 8;
+    doc.setLineWidth(1.5);
+    doc.setDrawColor(EY_YELLOW);
+    doc.line(margin, y, margin + 90, y);
+    y += 18;
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(EY_GREY_TEXT);
+    if (clientFields.name) { doc.text(`Prepared for: ${clientFields.name}`, margin, y); y += 14; }
+    if (clientFields.brand) { doc.text(`Prepared by: ${clientFields.brand}`, margin, y); y += 14; }
+    if (clientFields.date) { doc.text(`Date: ${clientFields.date}`, margin, y); y += 14; }
+    if (clientFields.notes) {
+      y += 4;
+      doc.setFontSize(9);
+      const noteLines = doc.splitTextToSize(clientFields.notes, pageWidth - 2 * margin);
+      doc.text(noteLines, margin, y);
+      y += noteLines.length * 11;
+    }
+  } else {
+    // Regular PDF header — brand neutral, EY color
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.setTextColor(EY_BLACK);
+    const tabLabel = { stt: "STT Costs Report", llm: "LLM Costs Report",
+                       tts: "TTS Costs Report", combined: "Stack Comparison Report" }[tab] || "Voice Stack Report";
+    doc.text(tabLabel, margin, y);
+    y += 6;
+    doc.setLineWidth(1.5);
+    doc.setDrawColor(EY_YELLOW);
+    doc.line(margin, y, margin + 80, y);
+    y += 16;
+  }
+
+  doc.setFont("helvetica", "italic");
+  doc.setFontSize(8);
+  doc.setTextColor(EY_GREY_TEXT);
+  doc.text(`Generated: ${nowTimestampIST()}   ·   Scope: ${scope === "all" ? "All models" : "Filtered selection"}`, margin, y);
+  y += 18;
+
+  // ===== SCENARIO SUMMARY (always included) =====
+  y = drawSectionTitle(doc, "Scenario Summary", y);
+  const hours = audioHours();
+  const calls = numCalls();
+  const summary = [
+    ["Volume", state.mode === "calls"
+      ? `${calls.toLocaleString("en-IN")} calls × ${state.duration} min = ${Math.round(hours).toLocaleString("en-IN")} audio hours`
+      : `${Math.round(hours).toLocaleString("en-IN")} audio hours (≈ ${calls.toLocaleString("en-IN")} calls)`],
+    ["Diarization", state.diarization ? "ON" : "OFF"],
+    ["Exchange Rate", `1 USD = Rs ${state.fx}`],
+    ["Display Currency", state.currency],
+    ["View Mode", state.view === "both" ? "Monthly + Annual" : state.view.charAt(0).toUpperCase() + state.view.slice(1)],
+    ["Input tokens / call", `${(state.transcriptTokens + state.sysTokens + state.kbTokens).toLocaleString("en-IN")} (transcript ${state.transcriptTokens} + system ${state.sysTokens} + KB ${state.kbTokens})`],
+    ["Output tokens / call", state.outTokens.toLocaleString("en-IN")],
+    ["TTS chars / call", state.ttsChars.toLocaleString("en-IN")],
+  ];
+  doc.autoTable({
+    startY: y,
+    body: summary,
+    styles: { font: "helvetica", fontSize: 9, cellPadding: 5, lineColor: [220,220,224], lineWidth: 0.3 },
+    columnStyles: { 0: { fontStyle: "bold", cellWidth: 130, fillColor: [248,248,250] }, 1: {} },
+    theme: "grid",
+    margin: { left: margin, right: margin }
+  });
+  y = doc.lastAutoTable.finalY + 18;
+
+  const isCombined = tab === "combined";
+  const want = sections || {};
+  const wantSection = key => isCombined ? !!want[key] : true; // non-combined tabs: include the single section
+
+  // For non-combined tabs, just render that one
+  if (!isCombined) {
+    if (tab === "stt") {
+      y = renderSTTSection(doc, scope, y, "stt");
+    } else if (tab === "llm") {
+      y = renderLLMSection(doc, scope, y, "llm");
+    } else if (tab === "tts") {
+      y = renderTTSSection(doc, scope, y, "tts");
+    }
+    if (includeBreakdowns) {
+      y = renderBreakdowns(doc, scope, tab, y);
+    }
+    return;
+  }
+
+  // Combined tab — render checked sections using combined_* filters
+  if (wantSection("stt_table"))   y = renderSTTSection(doc, scope, y, "combined_stt");
+  if (wantSection("llm_table"))   y = renderLLMSection(doc, scope, y, "combined_llm");
+  if (wantSection("tts_table"))   y = renderTTSSection(doc, scope, y, "combined_tts");
+  if (wantSection("stt_llm"))     y = renderPairMatrix(doc, scope, "stt_llm", y);
+  if (wantSection("stt_tts"))     y = renderPairMatrix(doc, scope, "stt_tts", y);
+  if (wantSection("llm_tts"))     y = renderPairMatrix(doc, scope, "llm_tts", y);
+  if (wantSection("full_matrix")) y = renderFullMatrix(doc, scope, y);
+  if (wantSection("recommended")) y = renderRecsSection(doc, scope, y);
+  if (includeBreakdowns)           y = renderBreakdowns(doc, scope, tab, y);
+}
+
+function drawSectionTitle(doc, title, y) {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  if (y > doc.internal.pageSize.getHeight() - 80) { doc.addPage(); y = 40; }
+  // Yellow band
+  doc.setFillColor(EY_YELLOW);
+  doc.rect(40, y - 12, pageWidth - 80, 22, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.setTextColor(EY_BLACK);
+  doc.text(title, 48, y + 3);
+  return y + 18;
+}
+
+function renderSTTSection(doc, scope, y, filterKey) {
+  y = drawSectionTitle(doc, "STT — Speech-to-Text Costs", y);
+  const rows = getSortedSTT(scope, filterKey);
+  if (rows.length === 0) {
+    doc.setFont("helvetica", "italic"); doc.setFontSize(9); doc.setTextColor(EY_GREY_TEXT);
+    doc.text("(no STT models match the current filters)", 48, y + 8); return y + 24;
+  }
+  const body = rows.map(s => [
+    s.platform, s.model_name, s.mode,
+    "Rs " + s.rate_inr_hr.toFixed(2) + "/hr",
+    inr(s.monthly),
+    inr(s.monthly * 12),
+    s.latency
+  ]);
+  doc.autoTable({
+    startY: y,
+    head: [["Platform", "Model", "Mode", "Effective Rate (INR)", "Monthly", "Annual", "Latency"]],
+    body, ...tableStyles()
+  });
+  return doc.lastAutoTable.finalY + 18;
+}
+
+function renderLLMSection(doc, scope, y, filterKey) {
+  y = drawSectionTitle(doc, "LLM — Language Model Costs", y);
+  const rows = getSortedLLM(scope, filterKey);
+  if (rows.length === 0) {
+    doc.setFont("helvetica", "italic"); doc.setFontSize(9); doc.setTextColor(EY_GREY_TEXT);
+    doc.text("(no LLMs match the current filters)", 48, y + 8); return y + 24;
+  }
+  const body = rows.map(l => [
+    l.model_name, l.provider,
+    "$" + l.input_per_1m_usd.toFixed(2) + " / 1M",
+    "$" + l.output_per_1m_usd.toFixed(2) + " / 1M",
+    inr(llmInputCostINR(l)),
+    inr(llmOutputCostINR(l)),
+    inr(l.monthly),
+    inr(l.monthly * 12)
+  ]);
+  doc.autoTable({
+    startY: y,
+    head: [["Model", "Provider", "Input rate (USD)", "Output rate (USD)", "Input cost", "Output cost", "Monthly", "Annual"]],
+    body, ...tableStyles()
+  });
+  return doc.lastAutoTable.finalY + 18;
+}
+
+function renderTTSSection(doc, scope, y, filterKey) {
+  y = drawSectionTitle(doc, "TTS — Text-to-Speech Costs", y);
+  const rows = getSortedTTS(scope, filterKey);
+  if (rows.length === 0) {
+    doc.setFont("helvetica", "italic"); doc.setFontSize(9); doc.setTextColor(EY_GREY_TEXT);
+    doc.text("(no TTS models match the current filters)", 48, y + 8); return y + 24;
+  }
+  const body = rows.map(t => [
+    t.platform, t.model_name, t.tier,
+    "Rs " + Math.round(t.rate_inr_chars).toLocaleString("en-IN") + " / 1M",
+    inr(t.monthly),
+    inr(t.monthly * 12)
+  ]);
+  doc.autoTable({
+    startY: y,
+    head: [["Platform", "Model", "Tier", "Rate (INR/1M chars)", "Monthly", "Annual"]],
+    body, ...tableStyles()
+  });
+  return doc.lastAutoTable.finalY + 18;
+}
+
+function renderPairMatrix(doc, scope, pairKind, y) {
+  const labels = {
+    stt_llm: { title: "STT + LLM Matrix", inc: {includeStt:true, includeLlm:true, includeTts:false} },
+    stt_tts: { title: "STT + TTS Matrix", inc: {includeStt:true, includeLlm:false, includeTts:true} },
+    llm_tts: { title: "LLM + TTS Matrix", inc: {includeStt:false, includeLlm:true, includeTts:true} },
+  }[pairKind];
+
+  const allRows = buildPairMatrix(scope, state.sort, null, labels.inc.includeStt, labels.inc.includeLlm, labels.inc.includeTts);
+  const truncated = allRows.length > 100;
+  const titleSuffix = truncated ? `(top 100 of ${allRows.length}, sorted by ${sortLabel(state.sort)})` : `(${allRows.length} combinations, sorted by ${sortLabel(state.sort)})`;
+  y = drawSectionTitle(doc, `${labels.title} ${titleSuffix}`, y);
+  const rows = truncated ? allRows.slice(0, 100) : allRows;
+  if (rows.length === 0) {
+    doc.setFont("helvetica", "italic"); doc.setFontSize(9); doc.setTextColor(EY_GREY_TEXT);
+    doc.text("(no combinations match the current filters)", 48, y + 8); return y + 24;
+  }
+
+  let head = ["#"];
+  if (labels.inc.includeStt) head.push("STT");
+  if (labels.inc.includeLlm) head.push("LLM");
+  if (labels.inc.includeTts) head.push("TTS");
+  if (labels.inc.includeStt) head.push("STT Cost");
+  if (labels.inc.includeLlm) head.push("LLM Cost");
+  if (labels.inc.includeTts) head.push("TTS Cost");
+  head.push("Monthly Total"); head.push("Annual Total");
+
+  const body = rows.map((r, i) => {
+    const c = [String(i+1)];
+    if (labels.inc.includeStt) c.push(r.stt.platform + " · " + r.stt.model_name);
+    if (labels.inc.includeLlm) c.push(r.llm.model_name);
+    if (labels.inc.includeTts) c.push(r.tts.platform + " · " + r.tts.model_name);
+    if (labels.inc.includeStt) c.push(inr(r.sCost));
+    if (labels.inc.includeLlm) c.push(inr(r.lCost));
+    if (labels.inc.includeTts) c.push(inr(r.tCost));
+    c.push(inr(r.total)); c.push(inr(r.total * 12));
+    return c;
+  });
+
+  doc.autoTable({ startY: y, head: [head], body, ...tableStyles() });
+  if (truncated) {
+    const noteY = doc.lastAutoTable.finalY + 8;
+    doc.setFont("helvetica", "italic"); doc.setFontSize(8); doc.setTextColor(EY_GREY_TEXT);
+    doc.text(`Showing top 100 of ${allRows.length} combinations. Full list in Excel export.`, 48, noteY);
+    return noteY + 14;
+  }
+  return doc.lastAutoTable.finalY + 18;
+}
+
+function renderFullMatrix(doc, scope, y) {
+  // Build full list first, then cap if needed
+  const allRows = buildCombinations(scope, "all", state.sort);
+  const truncated = allRows.length > 100;
+  const titleSuffix = truncated ? `(top 100 of ${allRows.length.toLocaleString("en-IN")}, sorted by ${sortLabel(state.sort)})` : `(${allRows.length} combinations, sorted by ${sortLabel(state.sort)})`;
+  y = drawSectionTitle(doc, `STT+LLM+TTS Matrix ${titleSuffix}`, y);
+  const rows = truncated ? allRows.slice(0, 100) : allRows;
+  if (rows.length === 0) {
+    doc.setFont("helvetica", "italic"); doc.setFontSize(9); doc.setTextColor(EY_GREY_TEXT);
+    doc.text("(no combinations match the current filters)", 48, y + 8); return y + 24;
+  }
+  const body = rows.map((r,i) => [
+    String(i+1),
+    r.stt.platform + " · " + r.stt.model_name,
+    r.llm.model_name,
+    r.tts.platform + " · " + r.tts.model_name,
+    inr(r.sCost), inr(r.lCost), inr(r.tCost),
+    inr(r.total), inr(r.total * 12)
+  ]);
+  doc.autoTable({
+    startY: y,
+    head: [["#", "STT", "LLM", "TTS", "STT Cost", "LLM Cost", "TTS Cost", "Monthly Total", "Annual Total"]],
+    body, ...tableStyles()
+  });
+  if (truncated) {
+    const noteY = doc.lastAutoTable.finalY + 8;
+    doc.setFont("helvetica", "italic"); doc.setFontSize(8); doc.setTextColor(EY_GREY_TEXT);
+    doc.text(`Showing top 100 of ${allRows.length.toLocaleString("en-IN")} combinations. Full list available in the Excel export.`, 48, noteY);
+    return noteY + 14;
+  }
+  return doc.lastAutoTable.finalY + 18;
+}
+
+function renderRecsSection(doc, scope, y) {
+  y = drawSectionTitle(doc, "Recommended Stacks", y);
+  const recs = getRecommendedStacks(scope);
+  if (recs.length === 0) {
+    doc.setFont("helvetica", "italic"); doc.setFontSize(9); doc.setTextColor(EY_GREY_TEXT);
+    doc.text("(no recommendations possible with current filters)", 48, y + 8); return y + 24;
+  }
+  const body = recs.map(r => [
+    r.label,
+    r.combo.stt.platform + " · " + r.combo.stt.model_name,
+    r.combo.llm.model_name,
+    r.combo.tts.platform + " · " + r.combo.tts.model_name,
+    inr(r.combo.total), inr(r.combo.total * 12)
+  ]);
+  doc.autoTable({
+    startY: y,
+    head: [["Recommendation", "STT", "LLM", "TTS", "Monthly", "Annual"]],
+    body, ...tableStyles()
+  });
+  return doc.lastAutoTable.finalY + 18;
+}
+
+function renderBreakdowns(doc, scope, tab, y) {
+  y = drawSectionTitle(doc, "Top 5 Cost Breakdowns (INR)", y);
+
+  // For tab-specific exports, breakdowns are top 5 of that leg's models
+  // For combined, top 5 stacks by sort key
+  let items = [];
+  if (tab === "stt") {
+    items = getSortedSTT(scope).slice(0, 5).map((s, i) => ({
+      title: `#${i+1} — Cheapest STT #${i+1}: ${s.platform} · ${s.model_name}`,
+      kind: "stt-only", stt: s, totalLine: inr(s.monthly) + " / month   ·   " + inr(s.monthly * 12) + " / year"
+    }));
+  } else if (tab === "llm") {
+    items = getSortedLLM(scope).slice(0, 5).map((l, i) => ({
+      title: `#${i+1} — Cheapest LLM #${i+1}: ${l.model_name} (${l.provider})`,
+      kind: "llm-only", llm: l, totalLine: inr(l.monthly) + " / month   ·   " + inr(l.monthly * 12) + " / year"
+    }));
+  } else if (tab === "tts") {
+    items = getSortedTTS(scope).slice(0, 5).map((t, i) => ({
+      title: `#${i+1} — Cheapest TTS #${i+1}: ${t.platform} · ${t.model_name}`,
+      kind: "tts-only", tts: t, totalLine: inr(t.monthly) + " / month   ·   " + inr(t.monthly * 12) + " / year"
+    }));
+  } else {
+    // combined — top 5 combinations by current sort, components-aware
+    items = buildCombinations(scope, state.components, state.sort, 5).map((r, i) => {
+      const legParts = [];
+      if (r.stt) legParts.push(r.stt.platform + " · " + r.stt.model_name);
+      if (r.llm) legParts.push(r.llm.model_name);
+      if (r.tts) legParts.push(r.tts.platform + " · " + r.tts.model_name);
+      return {
+        title: `#${i+1} — ${sortLabel(state.sort)} #${i+1}: ${legParts.join(" + ")}`,
+        kind: "stack", stt: r.stt, llm: r.llm, tts: r.tts,
+        totalLine: inr(r.total) + " / month   ·   " + inr(r.total * 12) + " / year"
+      };
+    });
+  }
+
+  items.forEach(item => {
+    // Heading band
+    if (y > doc.internal.pageSize.getHeight() - 200) { doc.addPage(); y = 40; }
+    doc.setFillColor(EY_YELLOW);
+    doc.rect(40, y - 10, doc.internal.pageSize.getWidth() - 80, 18, "F");
+    doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.setTextColor(EY_BLACK);
+    const titleLines = doc.splitTextToSize(item.title, doc.internal.pageSize.getWidth() - 90);
+    doc.text(titleLines[0], 48, y + 2);
+    y += 14;
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(EY_GREY_TEXT);
+    doc.text(item.totalLine, 48, y); y += 12;
+
+    // Breakdown table
+    const rows = breakdownRows(item);
+    doc.autoTable({
+      startY: y, body: rows,
+      styles: { font: "helvetica", fontSize: 8.5, cellPadding: 4, lineColor: [220,220,224], lineWidth: 0.3 },
+      columnStyles: { 0: { fontStyle: "normal", cellWidth: 220, textColor: EY_GREY_TEXT }, 1: { halign: "right", textColor: EY_BLACK } },
+      theme: "grid",
+      margin: { left: 40, right: 40 }
+    });
+    y = doc.lastAutoTable.finalY + 14;
+  });
+  return y;
+}
+
+function breakdownRows(item) {
+  const hours = audioHours(), calls = numCalls(), chars = totalTtsChars();
+  const inTok = totalInputTokens(), outTok = totalOutputTokens();
+  const rows = [];
+  if (item.kind === "stt-only" || item.kind === "stack") {
+    const s = item.kind === "stt-only" ? item.stt : item.stt;
+    if (s) {
+      rows.push(["STT — " + s.platform + " · " + s.model_name, ""]);
+      rows.push(["  Base rate", "Rs " + (s.rate_usd_per_hour * state.fx).toFixed(2) + " / hr  ($" + s.rate_usd_per_hour.toFixed(4) + ")"]);
+      if (state.diarization && s.diarization_flat_usd_per_hr > 0) {
+        rows.push(["  + Diarization add-on", "Rs " + (s.diarization_flat_usd_per_hr * state.fx).toFixed(2) + " / hr"]);
+      }
+      const eff = s.rate_usd_per_hour + (state.diarization ? s.diarization_flat_usd_per_hr : 0);
+      rows.push(["  Effective rate", "Rs " + (eff * state.fx).toFixed(2) + " / hr"]);
+      rows.push(["  × Audio hours", Math.round(hours).toLocaleString("en-IN") + " hrs"]);
+      rows.push(["  STT monthly", inr(sttMonthlyINR(s))]);
+    }
+  }
+  if (item.kind === "llm-only" || item.kind === "stack") {
+    const l = item.kind === "llm-only" ? item.llm : item.llm;
+    if (l) {
+      rows.push(["LLM — " + l.model_name + " (" + l.provider + ")", ""]);
+      rows.push(["  Input tokens / call", (state.transcriptTokens + state.sysTokens + state.kbTokens).toLocaleString("en-IN") + " (transcript " + state.transcriptTokens + " + system " + state.sysTokens + " + KB " + state.kbTokens + ")"]);
+      rows.push(["  Output tokens / call", state.outTokens.toLocaleString("en-IN")]);
+      rows.push(["  Total input × " + calls.toLocaleString("en-IN") + " calls", inTok.toLocaleString("en-IN") + " tokens"]);
+      rows.push(["  Total output × " + calls.toLocaleString("en-IN") + " calls", outTok.toLocaleString("en-IN") + " tokens"]);
+      rows.push(["  Input cost @ Rs " + (l.input_per_1m_usd * state.fx).toFixed(2) + "/1M", inr(llmInputCostINR(l))]);
+      rows.push(["  Output cost @ Rs " + (l.output_per_1m_usd * state.fx).toFixed(2) + "/1M", inr(llmOutputCostINR(l))]);
+      rows.push(["  LLM monthly", inr(llmMonthlyINR(l))]);
+    }
+  }
+  if (item.kind === "tts-only" || item.kind === "stack") {
+    const t = item.kind === "tts-only" ? item.tts : item.tts;
+    if (t) {
+      rows.push(["TTS — " + t.platform + " · " + t.model_name, ""]);
+      rows.push(["  Chars / response × " + calls.toLocaleString("en-IN") + " calls", chars.toLocaleString("en-IN") + " chars"]);
+      rows.push(["  Rate", "Rs " + Math.round(t.rate_usd_per_1m_chars * state.fx).toLocaleString("en-IN") + " / 1M chars"]);
+      rows.push(["  TTS monthly", inr(ttsMonthlyINR(t))]);
+    }
+  }
+  return rows;
+}
+
+function tableStyles() {
+  return {
+    styles: { font: "helvetica", fontSize: 8.5, cellPadding: 5, lineColor: [220, 220, 224], lineWidth: 0.3, textColor: EY_BLACK },
+    headStyles: { fillColor: EY_BLACK, textColor: EY_YELLOW, fontStyle: "bold", fontSize: 9, halign: "left" },
+    alternateRowStyles: { fillColor: [248,248,250] },
+    theme: "grid",
+    margin: { left: 40, right: 40 }
+  };
+}
+
+// =========================
+// EXCEL BUILDER — formula-linked
+// =========================
+function buildExcel(wb, scope, sections, includeBreakdowns, tab) {
+  // INPUTS sheet (always first — drives everything)
+  const inputsAOA = [
+    ["Voice Stack Calculator — Inputs"],
+    [],
+    ["Key", "Value", "Notes / Help"],
+    ["Volume (calls or hours)", state.volume, "Number of calls per month (or audio hours if mode = hours)"],
+    ["Mode", state.mode, "'calls' or 'hours'"],
+    ["Avg call duration (min)", state.duration, "Used only when mode = 'calls'"],
+    ["Diarization", state.diarization ? "ON" : "OFF", "Toggles STT diarization flat add-on"],
+    ["Transcript tokens / call", state.transcriptTokens, "Part of LLM input"],
+    ["System prompt tokens", state.sysTokens, "Part of LLM input"],
+    ["KB / context tokens", state.kbTokens, "Part of LLM input"],
+    ["Output tokens / call", state.outTokens, "LLM output"],
+    ["TTS chars / response", state.ttsChars, "Per-call avg TTS character count"],
+    [],
+    ["Derived (formulas — do not edit)"],
+    ["Audio hours / month", { f: state.mode === "calls" ? "=B4*B6/60" : "=B4" }, "Used by STT calculations"],
+    ["Number of calls", { f: state.mode === "calls" ? "=B4" : "=B4*60/B6" }, "Used by LLM/TTS calculations"],
+    ["Total input tokens", { f: "=(B8+B9+B10)*B17" }, "Across all calls"],
+    ["Total output tokens", { f: "=B11*B17" }, ""],
+    ["Total TTS chars", { f: "=B12*B17" }, ""],
+    ["Diarization multiplier", { f: '=IF(B7="ON",1,0)' }, "1 = on, 0 = off"],
+  ];
+  const wsInputs = XLSX.utils.aoa_to_sheet(inputsAOA);
+  styleExcelSheet(wsInputs, "Inputs");
+  setColWidths(wsInputs, [30, 22, 50]);
+  XLSX.utils.book_append_sheet(wb, wsInputs, "Inputs");
+
+  // CONFIG sheet (FX rate)
+  const configAOA = [
+    ["Configuration"], [],
+    ["Key", "Value", "Notes"],
+    ["USD → INR exchange rate", state.fx, "Edit this cell — all INR values across the workbook recalculate"],
+    ["Last verified", "2025-05-25", "Date prices were audited against official sources"],
+    ["Generated at", nowTimestampIST(), "Timestamp of this export"],
+    ["Source", "Voice Stack Calculator dashboard", ""],
+  ];
+  const wsConfig = XLSX.utils.aoa_to_sheet(configAOA);
+  styleExcelSheet(wsConfig, "Config");
+  setColWidths(wsConfig, [30, 28, 60]);
+  XLSX.utils.book_append_sheet(wb, wsConfig, "Config");
+
+  // SCENARIO sheet (always included silently)
+  const scenarioAOA = [
+    ["Scenario Summary"], [],
+    ["Metric", "Value"],
+    ["Volume", { f: 'Inputs!B5&" "&IF(Inputs!B5="calls"," calls × "&Inputs!B6&" min = "&ROUND(Inputs!B15,0)&" audio hours",Inputs!B15&" audio hours")' }],
+    ["Diarization", { f: "=Inputs!B7" }],
+    ["FX rate", { f: '="1 USD = Rs "&Config!B4' }],
+    ["Display currency", state.currency],
+    ["View mode", state.view],
+    ["Input tokens / call", { f: "=Inputs!B8+Inputs!B9+Inputs!B10" }],
+    ["Output tokens / call", { f: "=Inputs!B11" }],
+    ["TTS chars / call", { f: "=Inputs!B12" }],
+    ["Audio hours / month", { f: "=Inputs!B15" }],
+    ["Number of calls / month", { f: "=Inputs!B16" }],
+    ["Generated at", nowTimestampIST()],
+  ];
+  const wsScenario = XLSX.utils.aoa_to_sheet(scenarioAOA);
+  styleExcelSheet(wsScenario, "Scenario");
+  setColWidths(wsScenario, [30, 50]);
+  XLSX.utils.book_append_sheet(wb, wsScenario, "Scenario");
+
+  // PRICING SHEETS — tab-aware
+  // STT/LLM/TTS tab: only that tab's pricing sheet
+  // Combined: only the checked sections
+  const want = sections || {};
+  const isCombined = tab === "combined";
+  if (!isCombined) {
+    if (tab === "stt") buildSttPricingSheet(wb, scope, "stt");
+    if (tab === "llm") buildLlmPricingSheet(wb, scope, "llm");
+    if (tab === "tts") buildTtsPricingSheet(wb, scope, "tts");
+  } else {
+    // Combined: render each section only if checkbox is checked, using combined_* filters
+    if (want.stt_table)      buildSttPricingSheet(wb, scope, "combined_stt");
+    if (want.llm_table)      buildLlmPricingSheet(wb, scope, "combined_llm");
+    if (want.tts_table)      buildTtsPricingSheet(wb, scope, "combined_tts");
+    if (want.stt_llm)        buildPairMatrixSheet(wb, scope, "stt_llm");
+    if (want.stt_tts)        buildPairMatrixSheet(wb, scope, "stt_tts");
+    if (want.llm_tts)        buildPairMatrixSheet(wb, scope, "llm_tts");
+    if (want.full_matrix)    buildFullMatrixSheet(wb, scope);
+    if (want.recommended)    buildRecommendationsSheet(wb, scope);
+  }
+
+  if (includeBreakdowns) buildBreakdownsSheet(wb, scope, tab, isCombined ? want : null);
+}
+
+// ---- pricing sheets ----
+function buildSttPricingSheet(wb, scope, filterKey) {
+  const list = scope === "all" ? STT_DATA : filteredSTT(filterKey || "stt");
+  const data = [
+    ["STT — Speech to Text Pricing"], [],
+    ["id","Platform","Model","Mode","Rate USD/hr","Rate INR/hr (formula)","Diariz Flat USD/hr","Diariz Flat INR/hr (formula)","Effective USD/hr (formula)","Effective INR/hr (formula)","Monthly INR (formula)","Annual INR (formula)","Latency","Notes"]
+  ];
+  list.forEach((s, i) => {
+    const r = i + 4; // row in sheet (1-indexed, header is row 3)
+    const isSarvam = s.id === "sarvam_saarika";
+    if (isSarvam) {
+      // INR is source of truth for Sarvam: column F (USD/hr) is formula, column E hardcoded would mismatch — so we put INR in F as hardcoded and USD in E as formula
+      data.push([
+        s.id, s.platform, s.model_name, s.mode,
+        { f: `=F${r}/Config!$B$4` },  // USD/hr formula
+        s.rate_usd_per_hour * state.fx,  // INR (hardcoded as 30)
+        { f: `=H${r}/Config!$B$4` },  // diariz USD formula
+        s.diarization_flat_usd_per_hr * state.fx,  // diariz INR hardcoded
+        { f: `=E${r}+G${r}` },
+        { f: `=F${r}+H${r}` },
+        { f: `=(F${r}+H${r}*Inputs!B20)*Inputs!B15` },  // Monthly INR = effective rate * audio hours (diariz multiplier from B20)
+        { f: `=K${r}*12` },
+        s.latency, s.notes
+      ]);
+    } else {
+      data.push([
+        s.id, s.platform, s.model_name, s.mode,
+        s.rate_usd_per_hour,
+        { f: `=E${r}*Config!$B$4` },
+        s.diarization_flat_usd_per_hr,
+        { f: `=G${r}*Config!$B$4` },
+        { f: `=E${r}+G${r}` },
+        { f: `=F${r}+H${r}` },
+        { f: `=(F${r}+H${r}*Inputs!B20)*Inputs!B15` },
+        { f: `=K${r}*12` },
+        s.latency, s.notes
+      ]);
+    }
+  });
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  styleExcelSheet(ws, "STT — Speech to Text Pricing");
+  setColWidths(ws, [22, 14, 22, 11, 14, 14, 16, 16, 16, 16, 16, 16, 12, 40]);
+  XLSX.utils.book_append_sheet(wb, ws, "STT_Pricing");
+}
+
+function buildLlmPricingSheet(wb, scope, filterKey) {
+  const list = scope === "all" ? LLM_DATA : filteredLLM(filterKey || "llm");
+  const data = [
+    ["LLM — Language Model Pricing"], [],
+    ["id","Model","Provider","Input USD/1M","Input INR/1M (formula)","Output USD/1M","Output INR/1M (formula)","Input Cost INR (formula)","Output Cost INR (formula)","Monthly INR (formula)","Annual INR (formula)","Notes"]
+  ];
+  list.forEach((l, i) => {
+    const r = i + 4;
+    if (l.input_per_1m_usd === null) {
+      data.push([l.id, l.model_name, l.provider, "—","—","—","—","—","—","—","—", l.notes || "Pricing on request"]);
+    } else {
+      data.push([
+        l.id, l.model_name, l.provider,
+        l.input_per_1m_usd,
+        { f: `=D${r}*Config!$B$4` },
+        l.output_per_1m_usd,
+        { f: `=F${r}*Config!$B$4` },
+        { f: `=Inputs!B17/1000000*E${r}` },
+        { f: `=Inputs!B18/1000000*G${r}` },
+        { f: `=H${r}+I${r}` },
+        { f: `=J${r}*12` },
+        l.notes
+      ]);
+    }
+  });
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  styleExcelSheet(ws, "LLM — Language Model Pricing");
+  setColWidths(ws, [22, 22, 14, 14, 16, 14, 16, 16, 16, 16, 16, 30]);
+  XLSX.utils.book_append_sheet(wb, ws, "LLM_Pricing");
+}
+
+function buildTtsPricingSheet(wb, scope, filterKey) {
+  const list = scope === "all" ? TTS_DATA : filteredTTS(filterKey || "tts");
+  const data = [
+    ["TTS — Text to Speech Pricing"], [],
+    ["id","Platform","Model","Tier","Rate USD/1M chars","Rate INR/1M chars (formula)","Monthly INR (formula)","Annual INR (formula)","Notes"]
+  ];
+  list.forEach((t, i) => {
+    const r = i + 4;
+    const isSarvam = t.platform === "Sarvam AI";
+    if (isSarvam) {
+      data.push([
+        t.id, t.platform, t.model_name, t.tier,
+        { f: `=F${r}/Config!$B$4` },
+        t.rate_usd_per_1m_chars * state.fx,
+        { f: `=Inputs!B19/1000000*F${r}` },
+        { f: `=G${r}*12` },
+        t.notes
+      ]);
+    } else {
+      data.push([
+        t.id, t.platform, t.model_name, t.tier,
+        t.rate_usd_per_1m_chars,
+        { f: `=E${r}*Config!$B$4` },
+        { f: `=Inputs!B19/1000000*F${r}` },
+        { f: `=G${r}*12` },
+        t.notes
+      ]);
+    }
+  });
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  styleExcelSheet(ws, "TTS — Text to Speech Pricing");
+  setColWidths(ws, [22, 14, 22, 10, 18, 20, 16, 16, 40]);
+  XLSX.utils.book_append_sheet(wb, ws, "TTS_Pricing");
+}
+
+// ---- matrix sheets ----
+function buildPairMatrixSheet(wb, scope, pairKind) {
+  const opts = {
+    stt_llm: { title: "STT + LLM Matrix", inc: {includeStt:true, includeLlm:true, includeTts:false}, sheetName: "STT_LLM_Matrix" },
+    stt_tts: { title: "STT + TTS Matrix", inc: {includeStt:true, includeLlm:false, includeTts:true}, sheetName: "STT_TTS_Matrix" },
+    llm_tts: { title: "LLM + TTS Matrix", inc: {includeStt:false, includeLlm:true, includeTts:true}, sheetName: "LLM_TTS_Matrix" },
+  }[pairKind];
+  const rows = buildPairMatrix(scope, state.sort, null, opts.inc.includeStt, opts.inc.includeLlm, opts.inc.includeTts);
+
+  let head = ["#"];
+  if (opts.inc.includeStt) head.push("STT Platform · Model");
+  if (opts.inc.includeLlm) head.push("LLM Model");
+  if (opts.inc.includeTts) head.push("TTS Platform · Model");
+  if (opts.inc.includeStt) head.push("STT Cost INR");
+  if (opts.inc.includeLlm) head.push("LLM Cost INR");
+  if (opts.inc.includeTts) head.push("TTS Cost INR");
+  head.push("Monthly Total INR"); head.push("Annual Total INR");
+
+  const data = [[opts.title + ` (sorted by ${sortLabel(state.sort)})`], [], head];
+  rows.forEach((r, i) => {
+    const c = [i+1];
+    if (opts.inc.includeStt) c.push(r.stt.platform + " · " + r.stt.model_name);
+    if (opts.inc.includeLlm) c.push(r.llm.model_name);
+    if (opts.inc.includeTts) c.push(r.tts.platform + " · " + r.tts.model_name);
+    if (opts.inc.includeStt) c.push(Math.round(r.sCost));
+    if (opts.inc.includeLlm) c.push(Math.round(r.lCost));
+    if (opts.inc.includeTts) c.push(Math.round(r.tCost));
+    c.push(Math.round(r.total)); c.push(Math.round(r.total * 12));
+    data.push(c);
+  });
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  styleExcelSheet(ws, opts.title);
+  setColWidths(ws, head.map((_, i) => i === 0 ? 5 : 20));
+  XLSX.utils.book_append_sheet(wb, ws, opts.sheetName);
+}
+
+function buildFullMatrixSheet(wb, scope) {
+  const rows = buildCombinations(scope, "all", state.sort, null); // no cap in Excel
+  const head = ["#","STT Platform · Model","LLM Model","TTS Platform · Model","STT Cost INR","LLM Cost INR","TTS Cost INR","Monthly Total INR","Annual Total INR"];
+  const data = [[`STT+LLM+TTS Matrix (sorted by ${sortLabel(state.sort)})`], [`${rows.length.toLocaleString("en-IN")} combinations`], [], head];
+  rows.forEach((r, i) => data.push([
+    i+1,
+    r.stt.platform + " · " + r.stt.model_name,
+    r.llm.model_name,
+    r.tts.platform + " · " + r.tts.model_name,
+    Math.round(r.sCost), Math.round(r.lCost), Math.round(r.tCost),
+    Math.round(r.total), Math.round(r.total * 12)
+  ]));
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  styleExcelSheet(ws, `STT+LLM+TTS Matrix (${rows.length} combinations)`);
+  setColWidths(ws, [5, 32, 22, 32, 14, 14, 14, 18, 18]);
+  XLSX.utils.book_append_sheet(wb, ws, "STT_LLM_TTS_Matrix");
+}
+
+function buildRecommendationsSheet(wb, scope) {
+  const recs = getRecommendedStacks(scope);
+  const data = [
+    ["Recommended Stacks (auto-computed)"], [],
+    ["Recommendation","STT","LLM","TTS","Monthly INR","Annual INR","Use case"]
+  ];
+  const useCases = {
+    "Cheapest Overall": "Lowest total monthly cost across current filters",
+    "Best for Batch / Async": "Post-call analytics, transcription pipelines, archival workloads",
+    "Best for Real-Time": "Live voice agents requiring low-latency response"
+  };
+  recs.forEach(r => data.push([
+    r.label,
+    r.combo.stt.platform + " · " + r.combo.stt.model_name,
+    r.combo.llm.model_name,
+    r.combo.tts.platform + " · " + r.combo.tts.model_name,
+    Math.round(r.combo.total), Math.round(r.combo.total * 12),
+    useCases[r.label] || ""
+  ]));
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  styleExcelSheet(ws, "Recommended Stacks");
+  setColWidths(ws, [22, 30, 22, 30, 16, 16, 50]);
+  XLSX.utils.book_append_sheet(wb, ws, "Recommendations");
+}
+
+function buildBreakdownsSheet(wb, scope, tab, sections) {
+  let items = [];
+  if (tab === "stt") {
+    items = getSortedSTT(scope).slice(0, 5).map((s,i) => ({
+      title: `#${i+1} — Cheapest STT #${i+1}: ${s.platform} · ${s.model_name}`,
+      total: s.monthly, stt: s, kind: "stt-only"
+    }));
+  } else if (tab === "llm") {
+    items = getSortedLLM(scope).slice(0, 5).map((l,i) => ({
+      title: `#${i+1} — Cheapest LLM #${i+1}: ${l.model_name} (${l.provider})`,
+      total: l.monthly, llm: l, kind: "llm-only"
+    }));
+  } else if (tab === "tts") {
+    items = getSortedTTS(scope).slice(0, 5).map((t,i) => ({
+      title: `#${i+1} — Cheapest TTS #${i+1}: ${t.platform} · ${t.model_name}`,
+      total: t.monthly, tts: t, kind: "tts-only"
+    }));
+  } else {
+    // Combined: components-aware breakdown
+    const comp = state.components;
+    items = buildCombinations(scope, comp, state.sort, 5).map((r,i) => {
+      const legParts = [];
+      if (r.stt) legParts.push(r.stt.platform + " · " + r.stt.model_name);
+      if (r.llm) legParts.push(r.llm.model_name);
+      if (r.tts) legParts.push(r.tts.platform + " · " + r.tts.model_name);
+      return {
+        title: `#${i+1} — ${sortLabel(state.sort)} #${i+1}: ${legParts.join(" + ")}`,
+        total: r.total, stt: r.stt, llm: r.llm, tts: r.tts,
+        kind: "stack"
+      };
+    });
+  }
+
+  const data = [["Top 5 Cost Breakdowns (INR)"], []];
+  items.forEach(item => {
+    data.push([item.title]);
+    data.push([`Total: Rs ${Math.round(item.total).toLocaleString("en-IN")} / month   ·   Rs ${Math.round(item.total * 12).toLocaleString("en-IN")} / year`]);
+    data.push(["Field", "Value"]);
+    const rows = breakdownRows(item);
+    rows.forEach(r => data.push(r));
+    data.push([]);  // separator
+  });
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  styleExcelSheet(ws, "Top 5 Cost Breakdowns");
+  setColWidths(ws, [55, 35]);
+  XLSX.utils.book_append_sheet(wb, ws, "Cost_Breakdowns");
+}
+
+// ---- excel styling helpers (limited because SheetJS community styling is limited) ----
+function styleExcelSheet(ws, title) {
+  // Add a top-left cell merge for title
+  if (!ws['!merges']) ws['!merges'] = [];
+  ws['!merges'].push({ s: { r: 0, c: 0 }, e: { r: 0, c: 11 } });
+}
+function setColWidths(ws, widths) {
+  ws['!cols'] = widths.map(w => ({ wch: w }));
+}
+
+// =========================
+// EXPORT DIALOG ORCHESTRATOR
+// =========================
+// showToast is defined in app1.js
+
+function openExportDialog(exportType) {
+  _pendingExportType = exportType;
+  const tab = getActiveTab();
+  const modal = document.getElementById("scopeModal");
+  const title = document.getElementById("scopeTitle");
+  const sub = document.getElementById("scopeSubtitle");
+  const allDesc = document.getElementById("scopeAllDesc");
+  const filteredDesc = document.getElementById("scopeFilteredDesc");
+  const sectionsContainer = document.getElementById("scopeSectionsContainer");
+  const sectionsList = document.getElementById("scopeSectionsList");
+
+  // Update title & subtitle per tab + type
+  const typeLabel = exportType === "excel" ? "Excel Workbook" : "PDF Report";
+  const tabLabel = { stt: "STT", llm: "LLM", tts: "TTS", combined: "Stack Comparison" }[tab] || "Voice Stack";
+  title.textContent = `Export ${tabLabel} ${typeLabel}`;
+  sub.textContent = `Configure what to include in the ${typeLabel.toLowerCase()}.`;
+
+  // Update scope descriptions with counts
+  if (tab === "stt") {
+    allDesc.textContent = `Full STT comparison across all ${STT_DATA.length} models`;
+    filteredDesc.textContent = `${filteredSTT("stt").length} of ${STT_DATA.length} STT models currently visible`;
+  } else if (tab === "llm") {
+    allDesc.textContent = `Full LLM comparison across all ${LLM_DATA.length} models`;
+    filteredDesc.textContent = `${filteredLLM("llm").length} of ${LLM_DATA.length} LLM models currently visible`;
+  } else if (tab === "tts") {
+    allDesc.textContent = `Full TTS comparison across all ${TTS_DATA.length} models`;
+    filteredDesc.textContent = `${filteredTTS("tts").length} of ${TTS_DATA.length} TTS models currently visible`;
+  } else {
+    const totalCombos = STT_DATA.length * LLM_DATA.filter(l => l.input_per_1m_usd !== null).length * TTS_DATA.length;
+    const filteredCombos = buildCombinations("filtered", "all", "total").length;
+    allDesc.textContent = `All ${totalCombos.toLocaleString("en-IN")} possible combinations`;
+    filteredDesc.textContent = `${filteredCombos.toLocaleString("en-IN")} combinations match your filters`;
+  }
+
+  // Show/hide section checkboxes (only for combined tab)
+  if (tab === "combined") {
+    sectionsContainer.style.display = "";
+    sectionsList.innerHTML = buildCombinedSectionCheckboxes();
+  } else {
+    sectionsContainer.style.display = "none";
+  }
+
+  // Client customization only applies to PDF — hide for Excel
+  const clientSection = document.getElementById("scopeClientSection");
+  if (clientSection) clientSection.style.display = exportType === "excel" ? "none" : "";
+
+  // Reset breakdown checkbox
+  document.getElementById("scopeIncludeBreakdowns").checked = false;
+  const breakdownChip = document.getElementById("scopeBreakdownChip");
+  if (breakdownChip) breakdownChip.classList.remove("checked");
+
+  // Reset client customization toggle + hide fields
+  const customizeChk = document.getElementById("scopeCustomizeForClient");
+  if (customizeChk) customizeChk.checked = false;
+  const clientChip = document.getElementById("scopeClientChip");
+  if (clientChip) clientChip.classList.remove("checked");
+  const clientFields = document.getElementById("scopeClientFields");
+  if (clientFields) clientFields.style.display = "none";
+
+  // Wire fresh handlers
+  modal.classList.add("open");
+}
+
+function buildCombinedSectionCheckboxes() {
+  // Defaults based on Components radio
+  const comp = state.components;
+  const def = {
+    stt_table: comp.includes("stt") || comp === "all",
+    llm_table: comp.includes("llm") || comp === "all",
+    tts_table: comp.includes("tts") || comp === "all",
+    stt_llm: comp === "all" || comp === "stt_llm",
+    stt_tts: comp === "all" || comp === "stt_tts",
+    llm_tts: comp === "all" || comp === "stt_llm" === false && comp === "llm_tts" || comp === "all",
+    full_matrix: comp === "all",
+    recommended: true,
+  };
+  // Fix the llm_tts logic above
+  def.llm_tts = (comp === "all" || comp === "llm_tts");
+
+  const sttCount = filteredSTT("combined_stt").length;
+  const llmCount = filteredLLM("combined_llm").filter(l => l.input_per_1m_usd !== null).length;
+  const ttsCount = filteredTTS("combined_tts").length;
+  const sttAllCount = STT_DATA.length;
+  const llmAllCount = LLM_DATA.filter(l => l.input_per_1m_usd !== null).length;
+  const ttsAllCount = TTS_DATA.length;
+
+  const items = [
+    { key: "stt_table", label: `STT table (${sttCount}/${sttAllCount} models)`, def: def.stt_table },
+    { key: "llm_table", label: `LLM table (${llmCount}/${llmAllCount} models)`, def: def.llm_table },
+    { key: "tts_table", label: `TTS table (${ttsCount}/${ttsAllCount} models)`, def: def.tts_table },
+    { key: "stt_llm", label: "STT + LLM matrix", def: def.stt_llm },
+    { key: "stt_tts", label: "STT + TTS matrix", def: def.stt_tts },
+    { key: "llm_tts", label: "LLM + TTS matrix", def: def.llm_tts },
+    { key: "full_matrix", label: "STT+LLM+TTS matrix (top 100 in PDF, all in Excel)", def: def.full_matrix },
+    { key: "recommended", label: "Recommended stacks", def: def.recommended },
+  ];
+  return items.map(it => `
+    <label class="modal-checkbox ${it.def ? "checked" : ""}">
+      <input type="checkbox" name="section" value="${it.key}" ${it.def ? "checked" : ""}>
+      <span class="checkbox-tick">✓</span>
+      <span>${it.label}</span>
+    </label>
+  `).join("");
+}
+
+function executeExport() {
+  const tab = getActiveTab();
+  const scopeRadio = document.querySelector('input[name="scope"]:checked');
+  const scope = scopeRadio ? scopeRadio.value : "filtered";
+  const includeBreakdowns = document.getElementById("scopeIncludeBreakdowns").checked;
+  let sections = {};
+  if (tab === "combined") {
+    document.querySelectorAll('input[name="section"]:checked').forEach(cb => sections[cb.value] = true);
+  }
+
+  // If client customization is enabled in the unified dialog, gather the fields
+  let clientFields = null;
+  const customizeChk = document.getElementById("scopeCustomizeForClient");
+  if (customizeChk && customizeChk.checked) {
+    clientFields = {
+      name: (document.getElementById("clientName")?.value || "").trim() || null,
+      brand: (document.getElementById("clientBrand")?.value || "").trim() || null,
+      date: (document.getElementById("clientDate")?.value || "") || null,
+      title: (document.getElementById("clientTitle")?.value || "").trim() || null,
+      notes: (document.getElementById("clientNotes")?.value || "").trim() || null,
+    };
+    // If every field is empty, treat as no customization
+    if (!clientFields.name && !clientFields.brand && !clientFields.date && !clientFields.title && !clientFields.notes) {
+      clientFields = null;
+    }
+  }
+
+  document.getElementById("scopeModal").classList.remove("open");
+  const type = _pendingExportType;
+
+  if (type === "excel") {
+    exportExcel(scope, sections, includeBreakdowns, tab);
+  } else {
+    exportPDF(scope, sections, includeBreakdowns, tab, clientFields);
+  }
+}
+
+
+// ====== app4.js ======
+// =======================
+// MAIN RENDER LOOP
+// =======================
+function renderAll() {
+  renderSTT();
+  renderLLM();
+  renderTTS();
+  renderCombined();
+  renderRecommendations();
+  renderBreakdown();
+  renderScenarioSummary();
+  // sync header status
+  $("verifiedDate").textContent = CONFIG.last_verified;
+  $("fxStamp").textContent = state.fx;
+  document.querySelectorAll(".verified-footer").forEach(e => e.textContent = CONFIG.last_verified);
+  document.querySelectorAll(".fx-footer").forEach(e => e.textContent = state.fx);
+  // persist filters
+  saveFiltersToStorage();
+}
+
+// =======================
+// EVENT WIRING
+// =======================
+function syncStateFromInputs() {
+  state.volume = +$("volumeInput").value || 1;
+  state.duration = +$("durationSlider").value;
+  state.transcriptTokens = +$("transcriptTokens").value || 0;
+  state.sysTokens = +$("sysTokens").value || 0;
+  state.kbTokens = +$("kbTokens").value || 0;
+  state.outTokens = +$("outTokens").value || 0;
+  state.ttsChars = +$("ttsChars").value || 0;
+  state.fx = +$("fxRate").value || 95.24;
+}
+
+function applyStateToInputs() {
+  $("volumeInput").value = state.volume;
+  $("durationSlider").value = state.duration;
+  $("durationValue").textContent = state.duration;
+  $("transcriptTokens").value = state.transcriptTokens;
+  $("sysTokens").value = state.sysTokens;
+  $("kbTokens").value = state.kbTokens;
+  $("outTokens").value = state.outTokens;
+  $("ttsChars").value = state.ttsChars;
+  $("fxRate").value = state.fx;
+  $("diarization").checked = state.diarization;
+  document.querySelectorAll("#modeToggle button").forEach(b => b.classList.toggle("active", b.dataset.mode === state.mode));
+  document.querySelectorAll(".currency-toggle button").forEach(b => b.classList.toggle("active", b.dataset.cur === state.currency));
+  document.querySelectorAll("#viewToggle button").forEach(b => b.classList.toggle("active", b.dataset.view === state.view));
+  document.querySelectorAll('input[name=comp]').forEach(r => {
+    r.checked = r.value === state.components;
+    r.closest(".radio-chip").classList.toggle("checked", r.checked);
+  });
+}
+
+// =======================
+// LOCALSTORAGE PERSISTENCE (filters only — never pricing)
+// =======================
+const STORAGE_KEY = "vsc_filters_v1";
+function saveFiltersToStorage() {
+  try {
+    const payload = {};
+    Object.keys(state.filters).forEach(k => {
+      payload[k] = {
+        platforms: [...state.filters[k].platforms],
+        models: [...state.filters[k].models]
+      };
+    });
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+  } catch (e) { /* localStorage might be disabled — silently ignore */ }
+}
+function loadFiltersFromStorage() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return false;
+    const payload = JSON.parse(raw);
+    Object.keys(payload).forEach(k => {
+      if (state.filters[k]) {
+        state.filters[k].platforms = new Set(payload[k].platforms || []);
+        state.filters[k].models = new Set(payload[k].models || []);
+      }
+    });
+    return true;
+  } catch (e) { return false; }
+}
+
+function wireEvents() {
+  // currency toggle (header — GLOBAL)
+  document.querySelectorAll(".currency-toggle button").forEach(btn => {
+    btn.addEventListener("click", () => {
+      state.currency = btn.dataset.cur;
+      document.querySelectorAll(".currency-toggle button").forEach(b => b.classList.toggle("active", b === btn));
+      renderAll();
+    });
+  });
+
+  // mode toggle (calls vs hours)
+  document.querySelectorAll("#modeToggle button").forEach(btn => {
+    btn.addEventListener("click", () => {
+      state.mode = btn.dataset.mode;
+      document.querySelectorAll("#modeToggle button").forEach(b => b.classList.toggle("active", b === btn));
+      renderAll();
+    });
+  });
+
+  // view toggle (monthly / annual / both — GLOBAL — left panel)
+  document.querySelectorAll("#viewToggle button").forEach(btn => {
+    btn.addEventListener("click", () => {
+      state.view = btn.dataset.view;
+      document.querySelectorAll("#viewToggle button").forEach(b => b.classList.toggle("active", b === btn));
+      renderAll();
+    });
+  });
+
+  // duration slider
+  $("durationSlider").addEventListener("input", () => {
+    $("durationValue").textContent = $("durationSlider").value;
+    state.duration = +$("durationSlider").value;
+    renderAll();
+  });
+
+  // volume input — live update
+  $("volumeInput").addEventListener("input", () => {
+    state.volume = +$("volumeInput").value || 1;
+    renderAll();
+  });
+
+  // diarization
+  $("diarization").addEventListener("change", () => {
+    state.diarization = $("diarization").checked;
+    renderAll();
+  });
+
+  // advanced toggle
+  $("advancedToggle").addEventListener("click", () => {
+    $("advancedBody").classList.toggle("open");
+    $("advancedToggle").querySelector(".chev").classList.toggle("open");
+  });
+
+  // advanced inputs + fx rate (FX is now in main panel, not advanced)
+  ["transcriptTokens","sysTokens","kbTokens","outTokens","ttsChars","fxRate"].forEach(id => {
+    $(id).addEventListener("input", () => {
+      syncStateFromInputs();
+      renderAll();
+    });
+  });
+
+  // sort select (Combined tab)
+  $("sortSelect").addEventListener("change", e => { state.sort = e.target.value; renderCombined(); });
+
+  // components radio (Combined tab)
+  document.querySelectorAll('input[name=comp]').forEach(r => {
+    r.addEventListener("change", () => {
+      state.components = r.value;
+      document.querySelectorAll(".radio-chip").forEach(c => c.classList.remove("checked"));
+      r.closest(".radio-chip").classList.add("checked");
+      renderAll();   // recommendations also depend on filters
+    });
+  });
+
+  // tabs
+  document.querySelectorAll(".tab").forEach(tab => {
+    tab.addEventListener("click", () => {
+      const target = tab.dataset.tab;
+      document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t === tab));
+      document.querySelectorAll(".tab-content").forEach(c => c.classList.toggle("active", c.id === `tab-${target}`));
+      // Re-render breakdown since it's tab-aware
+      renderBreakdown();
+      setTimeout(() => {
+        if (target === "stt" && state.charts.stt) state.charts.stt.resize();
+        if (target === "llm" && state.charts.llm) state.charts.llm.resize();
+        if (target === "tts" && state.charts.tts) state.charts.tts.resize();
+        if (target === "combined" && state.charts.combined) state.charts.combined.resize();
+      }, 50);
+    });
+  });
+
+  // breakdown count dropdown
+  if ($("breakdownCount")) {
+    $("breakdownCount").addEventListener("change", () => renderBreakdown());
+  }
+
+  // token toggle (LLM tab)
+  if ($("tokenToggleBtn")) {
+    $("tokenToggleBtn").addEventListener("click", () => {
+      $("tokenDerivation").classList.toggle("open");
+      $("tokenToggleBtn").querySelector(".chev").classList.toggle("open");
+    });
+  }
+
+  // breakdown toggle
+  $("breakdownHeader").addEventListener("click", () => {
+    $("breakdownBody").classList.toggle("open");
+    $("breakdownChev").classList.toggle("open");
+    $("breakdownHeader").querySelector("h3").firstChild.nextSibling.textContent =
+      $("breakdownBody").classList.contains("open") ? " Cost Calculation Breakdown" : " Show Cost Calculation Breakdown";
+  });
+
+  // calculate button — scrolls to breakdown
+  $("calculateBtn").addEventListener("click", () => {
+    if (!$("breakdownBody").classList.contains("open")) {
+      $("breakdownBody").classList.add("open");
+      $("breakdownChev").classList.add("open");
+    }
+    $("breakdownCard").scrollIntoView({behavior:"smooth", block:"start"});
+  });
+
+  // Go to Top button — appears on scroll, smooth-scrolls to top
+  const goTopBtn = $("goToTopBtn");
+  if (goTopBtn) {
+    window.addEventListener("scroll", () => {
+      if (window.scrollY > 400) goTopBtn.classList.add("visible");
+      else goTopBtn.classList.remove("visible");
+    });
+    goTopBtn.addEventListener("click", () => {
+      window.scrollTo({top: 0, behavior: "smooth"});
+    });
+  }
+
+  // ============= EXPORTS — tab-aware via app3 =============
+  document.querySelectorAll("[data-export]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const type = btn.dataset.export;
+      if (type === "link") { copyShareLink(); return; }
+      openExportDialog(type);
+    });
+  });
+
+  // scope modal — Continue button triggers executeExport (in app3)
+  $("scopeCancel").addEventListener("click", () => $("scopeModal").classList.remove("open"));
+  $("scopeContinue").addEventListener("click", () => executeExport());
+
+  // section checkbox visual feedback
+  document.addEventListener("change", e => {
+    if (e.target.matches('#scopeSectionsList input[type=checkbox]')) {
+      const chip = e.target.closest(".modal-checkbox");
+      if (chip) chip.classList.toggle("checked", e.target.checked);
+    }
+    if (e.target.matches('#scopeIncludeBreakdowns')) {
+      const chip = e.target.closest(".modal-checkbox");
+      if (chip) chip.classList.toggle("checked", e.target.checked);
+    }
+    if (e.target.matches('input[name="scope"]')) {
+      document.querySelectorAll('.modal-option').forEach(o => o.classList.remove("selected"));
+      e.target.closest('.modal-option').classList.add("selected");
+    }
+    // Client customization toggle — show/hide the client fields
+    if (e.target.matches('#scopeCustomizeForClient')) {
+      const fields = $("scopeClientFields");
+      if (fields) fields.style.display = e.target.checked ? "" : "none";
+      const chip = e.target.closest(".modal-checkbox");
+      if (chip) chip.classList.toggle("checked", e.target.checked);
+    }
+  });
+}
+
+// =======================
+// INIT
+// =======================
+function init() {
+  loadFromUrl();
+  initFilters();              // populate with all selected by default
+  loadFiltersFromStorage();   // overwrite with persisted state if available
+  applyStateToInputs();
+
+  // Build the three tab filter cards
+  Object.values(filterConfigs).forEach(opts => rebuildFilterCard(opts));
+
+  // Build Combined tab with THREE filter sections (STT × LLM × TTS)
+  // Each section's wrapper has an ID so we can show/hide based on Components radio
+  const combinedCard = $("combinedFilterCard");
+  combinedCard.innerHTML = `
+    <div class="combined-axis-block" id="combinedSttBlock">
+      <div class="combined-axis-title">▾ STT — Speech to Text</div>
+      <div id="combinedSttFilterBody"></div>
+    </div>
+    <div class="combined-axis-block" id="combinedLlmBlock">
+      <div class="combined-axis-title">▾ LLM — Language Model</div>
+      <div id="combinedLlmFilterBody"></div>
+    </div>
+    <div class="combined-axis-block" id="combinedTtsBlock">
+      <div class="combined-axis-title">▾ TTS — Text to Speech</div>
+      <div id="combinedTtsFilterBody"></div>
+    </div>
+  `;
+
+  const combinedSttOpts = {
+    cardId: "combinedSttFilterBody",
+    filterKey: "combined_stt",
+    data: STT_DATA,
+    platformField: "platform",
+    modelField: "id",
+    platformLabel: "STT Platforms & Models",
+    modelDisplay: d => d.model_name,
+    showModeToggle: true
+  };
+  const combinedLlmOpts = {
+    cardId: "combinedLlmFilterBody",
+    filterKey: "combined_llm",
+    data: LLM_DATA,
+    platformField: "provider",
+    modelField: "id",
+    platformLabel: "LLM Providers & Models",
+    modelDisplay: d => d.model_name
+  };
+  const combinedTtsOpts = {
+    cardId: "combinedTtsFilterBody",
+    filterKey: "combined_tts",
+    data: TTS_DATA,
+    platformField: "platform",
+    modelField: "id",
+    platformLabel: "TTS Platforms & Models",
+    modelDisplay: d => d.model_name
+  };
+  rebuildFilterCard(combinedSttOpts);
+  rebuildFilterCard(combinedLlmOpts);
+  rebuildFilterCard(combinedTtsOpts);
+  filterConfigs.combined_stt = combinedSttOpts;
+  filterConfigs.combined_llm = combinedLlmOpts;
+  filterConfigs.combined_tts = combinedTtsOpts;
+
+  wireEvents();
+  renderAll();
+}
+
+document.addEventListener("DOMContentLoaded", init);
+
+</script>
+</body>
+</html>
