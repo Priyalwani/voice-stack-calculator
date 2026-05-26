@@ -1366,6 +1366,7 @@ textarea.input {
       <span class="fx-stamp" title="USD to INR exchange rate">1 USD = ₹<span id="fxStamp">95.24</span></span>
       <span class="verified">Verified: <span id="verifiedDate">2025-05-25</span></span>
       <span class="status-badge"><span class="status-dot"></span><span id="dataStatus">Live data</span></span>
+      <a href="pricing.xlsx" download class="verified" style="text-decoration:none;cursor:pointer" title="Download the linked pricing workbook">⬇ Pricing sheet</a>
     </div>
   </div>
 </header>
@@ -4700,7 +4701,133 @@ function init() {
   renderAll();
 }
 
-document.addEventListener("DOMContentLoaded", init);
+// ====================================================================
+// LIVE PRICING LOADER — pulls from pricing.xlsx (same dir) at page load.
+// Falls back to hardcoded arrays above if fetch/parse fails.
+// ====================================================================
+async function loadPricingFromXlsx() {
+  try {
+    const res = await fetch("pricing.xlsx", { cache: "no-cache" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const buf = await res.arrayBuffer();
+    const wb = XLSX.read(buf, { type: "array" });
+
+    // ---- FX rate from Config sheet ----
+    let fx = CONFIG.usd_to_inr;
+    const cfg = XLSX.utils.sheet_to_json(wb.Sheets["Config"], { header: 1 });
+    for (const row of cfg) {
+      if (row && row[0] === "usd_to_inr" && typeof row[1] === "number") { fx = row[1]; break; }
+      if (row && row[0] === "last_verified" && row[1]) { CONFIG.last_verified = String(row[1]).slice(0, 10); }
+      if (row && row[0] === "data_status" && row[1]) { CONFIG.data_status = String(row[1]); }
+    }
+    CONFIG.usd_to_inr = fx;
+    state.fx = fx;
+
+    // Helper: parse a data sheet whose header row starts with "id"
+    function parseSheet(name) {
+      const ws = wb.Sheets[name];
+      if (!ws) return [];
+      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
+      const hdrIdx = rows.findIndex(r => Array.isArray(r) && r[0] === "id");
+      if (hdrIdx < 0) return [];
+      const headers = rows[hdrIdx];
+      return rows.slice(hdrIdx + 1).filter(r => r && r[0]).map(r => {
+        const o = {};
+        headers.forEach((h, i) => { if (h) o[h] = r[i]; });
+        return o;
+      });
+    }
+    const num = v => (typeof v === "number" && !isNaN(v)) ? v : null;
+
+    // ---- STT ----
+    const sttRows = parseSheet("STT_Pricing");
+    if (sttRows.length) {
+      const mapped = sttRows.map(o => {
+        const usd = num(o["Rate (USD/hr)"]);
+        const inr = num(o["Rate (INR/hr)"]);
+        const diarUsd = num(o["Diarization Flat (USD/hr)"]);
+        const diarInr = num(o["Diarization Flat (INR/hr)"]);
+        const finalUsd = usd != null ? usd : (inr != null ? inr / fx : 0);
+        const finalDiarUsd = diarUsd != null ? diarUsd : (diarInr != null ? diarInr / fx : 0);
+        return {
+          id: o.id,
+          platform: o.Platform,
+          model_name: o.Model,
+          mode: o.Mode,
+          rate_usd_per_hour: finalUsd,
+          diarization_flat_usd_per_hr: finalDiarUsd,
+          latency: o.Mode === "Realtime" ? "Realtime" : (o.Mode === "Both" ? "Both" : "Async"),
+          notes: o.Notes || ""
+        };
+      });
+      STT_DATA.length = 0;
+      STT_DATA.push(...mapped);
+    }
+
+    // ---- LLM ----
+    const llmRows = parseSheet("LLM_Pricing");
+    if (llmRows.length) {
+      const mapped = llmRows.map(o => {
+        const inUsd = num(o["Input (USD/1M)"]);
+        const outUsd = num(o["Output (USD/1M)"]);
+        const inInr = num(o["Input (INR/1M)"]);
+        const outInr = num(o["Output (INR/1M)"]);
+        const row = {
+          id: o.id,
+          model_name: o.Model,
+          provider: o.Provider,
+          input_per_1m_usd: inUsd != null ? inUsd : (inInr != null ? inInr / fx : null),
+          output_per_1m_usd: outUsd != null ? outUsd : (outInr != null ? outInr / fx : null),
+          notes: o.Notes || ""
+        };
+        if (inInr != null && inUsd == null) {
+          row.inr_native = true;
+          row.input_per_1m_inr = inInr;
+          row.output_per_1m_inr = outInr;
+        }
+        return row;
+      });
+      LLM_DATA.length = 0;
+      LLM_DATA.push(...mapped);
+    }
+
+    // ---- TTS ----
+    const ttsRows = parseSheet("TTS_Pricing");
+    if (ttsRows.length) {
+      const mapped = ttsRows.map(o => {
+        const usd = num(o["Rate (USD/1M chars)"]);
+        const inr = num(o["Rate (INR/1M chars)"]);
+        return {
+          id: o.id,
+          platform: o.Platform,
+          model_name: o.Model,
+          tier: o.Tier,
+          rate_usd_per_1m_chars: usd != null ? usd : (inr != null ? inr / fx : 0),
+          notes: o.Notes || ""
+        };
+      });
+      TTS_DATA.length = 0;
+      TTS_DATA.push(...mapped);
+    }
+
+    // Reflect FX + verified date in UI inputs that init() will read
+    const fxInput = document.getElementById("fxRate");
+    if (fxInput) fxInput.value = fx;
+    document.querySelectorAll("#fxStamp").forEach(el => el.textContent = fx.toFixed(2));
+    document.querySelectorAll(".fx-footer").forEach(el => el.textContent = fx.toFixed(2));
+    const vd = document.getElementById("verifiedDate");
+    if (vd && CONFIG.last_verified) vd.textContent = CONFIG.last_verified;
+
+    console.log("Loaded pricing from pricing.xlsx", { stt: STT_DATA.length, llm: LLM_DATA.length, tts: TTS_DATA.length, fx });
+  } catch (e) {
+    console.warn("pricing.xlsx not loaded, using hardcoded fallback:", e);
+  }
+}
+
+document.addEventListener("DOMContentLoaded", async () => {
+  await loadPricingFromXlsx();
+  init();
+});
 
 </script>
 </body>
