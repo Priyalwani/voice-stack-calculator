@@ -1366,7 +1366,8 @@ textarea.input {
       <span class="fx-stamp" title="USD to INR exchange rate">1 USD = ₹<span id="fxStamp">95.24</span></span>
       <span class="verified">Verified: <span id="verifiedDate">2025-05-25</span></span>
       <span class="status-badge"><span class="status-dot"></span><span id="dataStatus">Live data</span></span>
-      <a href="pricing.xlsx" download class="verified" style="text-decoration:none;cursor:pointer" title="Download the linked pricing workbook">⬇ Pricing sheet</a>
+      <a href="https://docs.google.com/spreadsheets/d/1ldsUrAK4k-zd7GH-g56kZ_MQR0P1ewgk/edit?usp=sharing&ouid=115343412915296097260&rtpof=true&sd=true" target="_blank" rel="noopener" class="verified" style="text-decoration:none;cursor:pointer;background:#FF6B35;color:#fff;padding:4px 10px;border-radius:6px" title="Edit the pricing sheet (anyone with this link can edit)">✏️ Edit prices</a>
+      <a href="pricing.xlsx" download class="verified" style="text-decoration:none;cursor:pointer" title="Download a snapshot of the pricing workbook">⬇ Download</a>
     </div>
   </div>
 </header>
@@ -4702,60 +4703,100 @@ function init() {
 }
 
 // ====================================================================
-// LIVE PRICING LOADER — pulls from pricing.xlsx (same dir) at page load.
-// Falls back to hardcoded arrays above if fetch/parse fails.
+// LIVE PRICING LOADER — pulls from Google Sheets CSVs at page load.
+// Anyone with the edit link can change the sheet; the dashboard re-reads
+// it on every page load. Falls back to hardcoded arrays if fetch fails.
 // ====================================================================
-async function loadPricingFromXlsx() {
-  try {
-    const res = await fetch("pricing.xlsx", { cache: "no-cache" });
-    if (!res.ok) throw new Error("HTTP " + res.status);
-    const buf = await res.arrayBuffer();
-    const wb = XLSX.read(buf, { type: "array" });
+const SHEETS = {
+  config: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTfb6WevE-P9kT_Uvc0HzGpOXX-laPH8RURr8aHjLi2RNXvLT-duyUbnBEGBEGQ6A/pub?gid=1045787876&single=true&output=csv",
+  stt:    "https://docs.google.com/spreadsheets/d/e/2PACX-1vTfb6WevE-P9kT_Uvc0HzGpOXX-laPH8RURr8aHjLi2RNXvLT-duyUbnBEGBEGQ6A/pub?gid=1426524734&single=true&output=csv",
+  llm:    "https://docs.google.com/spreadsheets/d/e/2PACX-1vTfb6WevE-P9kT_Uvc0HzGpOXX-laPH8RURr8aHjLi2RNXvLT-duyUbnBEGBEGQ6A/pub?gid=1906190459&single=true&output=csv",
+  tts:    "https://docs.google.com/spreadsheets/d/e/2PACX-1vTfb6WevE-P9kT_Uvc0HzGpOXX-laPH8RURr8aHjLi2RNXvLT-duyUbnBEGBEGQ6A/pub?gid=1172297806&single=true&output=csv",
+};
 
-    // ---- FX rate from Config sheet ----
+// Tiny CSV parser that handles quoted fields, embedded commas and newlines.
+function parseCSV(text) {
+  const rows = [];
+  let row = [], field = "", inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"') {
+        if (text[i + 1] === '"') { field += '"'; i++; }
+        else { inQuotes = false; }
+      } else field += c;
+    } else {
+      if (c === '"') inQuotes = true;
+      else if (c === ',') { row.push(field); field = ""; }
+      else if (c === '\n') { row.push(field); rows.push(row); row = []; field = ""; }
+      else if (c === '\r') { /* skip */ }
+      else field += c;
+    }
+  }
+  if (field.length || row.length) { row.push(field); rows.push(row); }
+  return rows;
+}
+
+const toNum = v => {
+  if (v === null || v === undefined || v === "") return null;
+  const n = parseFloat(String(v).replace(/,/g, ""));
+  return isNaN(n) ? null : n;
+};
+
+async function fetchCSV(url) {
+  const res = await fetch(url, { cache: "no-cache" });
+  if (!res.ok) throw new Error("HTTP " + res.status + " on " + url);
+  return parseCSV(await res.text());
+}
+
+// Convert a sheet (array of rows) into objects, using the row that starts
+// with "id" as the header row.
+function rowsToObjects(rows) {
+  const hdrIdx = rows.findIndex(r => r && r[0] === "id");
+  if (hdrIdx < 0) return [];
+  const headers = rows[hdrIdx];
+  return rows.slice(hdrIdx + 1).filter(r => r && r[0]).map(r => {
+    const o = {};
+    headers.forEach((h, i) => { if (h) o[h] = r[i]; });
+    return o;
+  });
+}
+
+async function loadPricingFromSheets() {
+  try {
+    const [cfgRows, sttRows, llmRows, ttsRows] = await Promise.all([
+      fetchCSV(SHEETS.config),
+      fetchCSV(SHEETS.stt),
+      fetchCSV(SHEETS.llm),
+      fetchCSV(SHEETS.tts),
+    ]);
+
+    // ---- Config ----
     let fx = CONFIG.usd_to_inr;
-    const cfg = XLSX.utils.sheet_to_json(wb.Sheets["Config"], { header: 1 });
-    for (const row of cfg) {
-      if (row && row[0] === "usd_to_inr" && typeof row[1] === "number") { fx = row[1]; break; }
-      if (row && row[0] === "last_verified" && row[1]) { CONFIG.last_verified = String(row[1]).slice(0, 10); }
-      if (row && row[0] === "data_status" && row[1]) { CONFIG.data_status = String(row[1]); }
+    for (const r of cfgRows) {
+      if (!r) continue;
+      if (r[0] === "usd_to_inr") { const n = toNum(r[1]); if (n) fx = n; }
+      else if (r[0] === "last_verified" && r[1]) CONFIG.last_verified = String(r[1]).slice(0, 10);
+      else if (r[0] === "data_status" && r[1]) CONFIG.data_status = String(r[1]);
     }
     CONFIG.usd_to_inr = fx;
     state.fx = fx;
 
-    // Helper: parse a data sheet whose header row starts with "id"
-    function parseSheet(name) {
-      const ws = wb.Sheets[name];
-      if (!ws) return [];
-      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
-      const hdrIdx = rows.findIndex(r => Array.isArray(r) && r[0] === "id");
-      if (hdrIdx < 0) return [];
-      const headers = rows[hdrIdx];
-      return rows.slice(hdrIdx + 1).filter(r => r && r[0]).map(r => {
-        const o = {};
-        headers.forEach((h, i) => { if (h) o[h] = r[i]; });
-        return o;
-      });
-    }
-    const num = v => (typeof v === "number" && !isNaN(v)) ? v : null;
-
     // ---- STT ----
-    const sttRows = parseSheet("STT_Pricing");
-    if (sttRows.length) {
-      const mapped = sttRows.map(o => {
-        const usd = num(o["Rate (USD/hr)"]);
-        const inr = num(o["Rate (INR/hr)"]);
-        const diarUsd = num(o["Diarization Flat (USD/hr)"]);
-        const diarInr = num(o["Diarization Flat (INR/hr)"]);
-        const finalUsd = usd != null ? usd : (inr != null ? inr / fx : 0);
-        const finalDiarUsd = diarUsd != null ? diarUsd : (diarInr != null ? diarInr / fx : 0);
+    const sttObjs = rowsToObjects(sttRows);
+    if (sttObjs.length) {
+      const mapped = sttObjs.map(o => {
+        const usd = toNum(o["Rate (USD/hr)"]);
+        const inr = toNum(o["Rate (INR/hr)"]);
+        const diarUsd = toNum(o["Diarization Flat (USD/hr)"]);
+        const diarInr = toNum(o["Diarization Flat (INR/hr)"]);
         return {
           id: o.id,
           platform: o.Platform,
           model_name: o.Model,
           mode: o.Mode,
-          rate_usd_per_hour: finalUsd,
-          diarization_flat_usd_per_hr: finalDiarUsd,
+          rate_usd_per_hour: usd != null ? usd : (inr != null ? inr / fx : 0),
+          diarization_flat_usd_per_hr: diarUsd != null ? diarUsd : (diarInr != null ? diarInr / fx : 0),
           latency: o.Mode === "Realtime" ? "Realtime" : (o.Mode === "Both" ? "Both" : "Async"),
           notes: o.Notes || ""
         };
@@ -4765,13 +4806,13 @@ async function loadPricingFromXlsx() {
     }
 
     // ---- LLM ----
-    const llmRows = parseSheet("LLM_Pricing");
-    if (llmRows.length) {
-      const mapped = llmRows.map(o => {
-        const inUsd = num(o["Input (USD/1M)"]);
-        const outUsd = num(o["Output (USD/1M)"]);
-        const inInr = num(o["Input (INR/1M)"]);
-        const outInr = num(o["Output (INR/1M)"]);
+    const llmObjs = rowsToObjects(llmRows);
+    if (llmObjs.length) {
+      const mapped = llmObjs.map(o => {
+        const inUsd = toNum(o["Input (USD/1M)"]);
+        const outUsd = toNum(o["Output (USD/1M)"]);
+        const inInr = toNum(o["Input (INR/1M)"]);
+        const outInr = toNum(o["Output (INR/1M)"]);
         const row = {
           id: o.id,
           model_name: o.Model,
@@ -4792,11 +4833,11 @@ async function loadPricingFromXlsx() {
     }
 
     // ---- TTS ----
-    const ttsRows = parseSheet("TTS_Pricing");
-    if (ttsRows.length) {
-      const mapped = ttsRows.map(o => {
-        const usd = num(o["Rate (USD/1M chars)"]);
-        const inr = num(o["Rate (INR/1M chars)"]);
+    const ttsObjs = rowsToObjects(ttsRows);
+    if (ttsObjs.length) {
+      const mapped = ttsObjs.map(o => {
+        const usd = toNum(o["Rate (USD/1M chars)"]);
+        const inr = toNum(o["Rate (INR/1M chars)"]);
         return {
           id: o.id,
           platform: o.Platform,
@@ -4818,14 +4859,14 @@ async function loadPricingFromXlsx() {
     const vd = document.getElementById("verifiedDate");
     if (vd && CONFIG.last_verified) vd.textContent = CONFIG.last_verified;
 
-    console.log("Loaded pricing from pricing.xlsx", { stt: STT_DATA.length, llm: LLM_DATA.length, tts: TTS_DATA.length, fx });
+    console.log("Loaded pricing from Google Sheets", { stt: STT_DATA.length, llm: LLM_DATA.length, tts: TTS_DATA.length, fx });
   } catch (e) {
-    console.warn("pricing.xlsx not loaded, using hardcoded fallback:", e);
+    console.warn("Live pricing failed, using hardcoded fallback:", e);
   }
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
-  await loadPricingFromXlsx();
+  await loadPricingFromSheets();
   init();
 });
 
