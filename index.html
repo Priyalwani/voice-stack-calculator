@@ -4819,6 +4819,15 @@ async function loadPricingFromSheets() {
     CONFIG.usd_to_inr = fx;
     state.fx = fx;
 
+    // Helper: detect INR-native rows. The sheet has USD = INR/FX formulas
+    // for Sarvam rows, so we can't infer from column emptiness — use
+    // platform/provider name and the "INR-NATIVE" notes prefix instead.
+    const isInrNativeRow = (platform, notes) => {
+      const p = String(platform || "").toLowerCase();
+      const n = String(notes || "").toLowerCase();
+      return p.includes("sarvam") || n.startsWith("inr-native") || n.startsWith("inr native");
+    };
+
     // ---- STT ----
     const sttObjs = rowsToObjects(sttRows);
     if (sttObjs.length) {
@@ -4827,19 +4836,19 @@ async function loadPricingFromSheets() {
         const inr = toNum(o["Rate (INR/hr)"]);
         const diarUsd = toNum(o["Diarization Flat (USD/hr)"]);
         const diarInr = toNum(o["Diarization Flat (INR/hr)"]);
-        // INR-native: USD column blank but INR column has a value (Sarvam, Bhashini)
-        const isInrNative = usd == null && inr != null;
+        const isInrNative = isInrNativeRow(o.Platform, o.Notes);
         const row = {
           id: o.id,
           platform: o.Platform,
           model_name: o.Model,
           mode: o.Mode,
-          rate_usd_per_hour: usd != null ? usd : (inr != null ? inr / fx : 0),
-          diarization_flat_usd_per_hr: diarUsd != null ? diarUsd : (diarInr != null ? diarInr / fx : 0),
+          // For INR-native, derive USD from INR; for others, INR is derived from USD
+          rate_usd_per_hour: isInrNative ? (inr != null ? inr / fx : 0) : (usd != null ? usd : (inr != null ? inr / fx : 0)),
+          diarization_flat_usd_per_hr: isInrNative ? (diarInr != null ? diarInr / fx : 0) : (diarUsd != null ? diarUsd : (diarInr != null ? diarInr / fx : 0)),
           latency: o.Mode === "Realtime" ? "Realtime" : (o.Mode === "Both" ? "Both" : "Async"),
           notes: o.Notes || ""
         };
-        if (isInrNative) {
+        if (isInrNative && inr != null) {
           row.inr_native = true;
           row.rate_inr_per_hour = inr;
           row.diarization_flat_inr_per_hr = diarInr != null ? diarInr : 0;
@@ -4858,16 +4867,18 @@ async function loadPricingFromSheets() {
         const outUsd = toNum(o["Output (USD/1M)"]);
         const inInr = toNum(o["Input (INR/1M)"]);
         const outInr = toNum(o["Output (INR/1M)"]);
-        const isInrNative = inUsd == null && inInr != null;
+        const isInrNative = isInrNativeRow(o.Provider, o.Notes);
         const row = {
           id: o.id,
           model_name: o.Model,
           provider: o.Provider,
-          input_per_1m_usd: inUsd != null ? inUsd : (inInr != null ? inInr / fx : null),
-          output_per_1m_usd: outUsd != null ? outUsd : (outInr != null ? outInr / fx : null),
+          // For INR-native models, derive USD from INR (the source of truth)
+          // so the USD view stays consistent with the live INR rate.
+          input_per_1m_usd: isInrNative ? (inInr != null ? inInr / fx : null) : (inUsd != null ? inUsd : (inInr != null ? inInr / fx : null)),
+          output_per_1m_usd: isInrNative ? (outInr != null ? outInr / fx : null) : (outUsd != null ? outUsd : (outInr != null ? outInr / fx : null)),
           notes: o.Notes || ""
         };
-        if (isInrNative) {
+        if (isInrNative && inInr != null) {
           row.inr_native = true;
           row.input_per_1m_inr = inInr;
           row.output_per_1m_inr = outInr;
@@ -4884,16 +4895,17 @@ async function loadPricingFromSheets() {
       const mapped = ttsObjs.map(o => {
         const usd = toNum(o["Rate (USD/1M chars)"]);
         const inr = toNum(o["Rate (INR/1M chars)"]);
-        const isInrNative = usd == null && inr != null;
+        const isInrNative = isInrNativeRow(o.Platform, o.Notes);
         const row = {
           id: o.id,
           platform: o.Platform,
           model_name: o.Model,
           tier: o.Tier,
-          rate_usd_per_1m_chars: usd != null ? usd : (inr != null ? inr / fx : 0),
+          // For INR-native, derive USD from INR; for others, INR is derived from USD
+          rate_usd_per_1m_chars: isInrNative ? (inr != null ? inr / fx : 0) : (usd != null ? usd : (inr != null ? inr / fx : 0)),
           notes: o.Notes || ""
         };
-        if (isInrNative) {
+        if (isInrNative && inr != null) {
           row.inr_native = true;
           row.rate_inr_per_1m_chars = inr;
         }
