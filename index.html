@@ -1739,9 +1739,9 @@ const STT_DATA = [
   { id:"aws_transcribe", platform:"AWS Transcribe", model_name:"Standard Tier 1", mode:"Both", rate_usd_per_hour:1.44, diarization_flat_usd_per_hr:0.00, latency:"Both", notes:"Tier 1; speaker labels included in base rate" },
   { id:"elevenlabs_scribe", platform:"ElevenLabs", model_name:"Scribe v1/v2", mode:"Batch", rate_usd_per_hour:0.22, diarization_flat_usd_per_hr:0.00, latency:"Async", notes:"Business-tier rate; diarization up to 32 speakers included" },
   { id:"elevenlabs_scribe_rt", platform:"ElevenLabs", model_name:"Scribe v2 Realtime", mode:"Realtime", rate_usd_per_hour:0.39, diarization_flat_usd_per_hr:0.00, latency:"Realtime", notes:"Business-tier rate; diarization NOT supported on realtime" },
-  { id:"sarvam_saarika", platform:"Sarvam AI", model_name:"Sarvam Speech-to-Text", mode:"Batch", rate_usd_per_hour:0.3150, diarization_flat_usd_per_hr:0.1575, latency:"Async", notes:"INR-native (₹30/hr base + ₹15/hr diarization = ₹45/hr)" },
-  { id:"sarvam_saaras", platform:"Sarvam AI", model_name:"Sarvam Speech-to-Text & Translate", mode:"Batch", rate_usd_per_hour:0.3150, diarization_flat_usd_per_hr:0.1575, latency:"Async", notes:"INR-native ₹30/hr base + ₹15/hr diariz. Transcribes + translates Indic audio → English." },
-  { id:"bhashini_asr", platform:"Bhashini", model_name:"ASR Indian Lang", mode:"Batch", rate_usd_per_hour:0.00, diarization_flat_usd_per_hr:0.00, latency:"Async", notes:"Govt of India free tier; diarization N/A" },
+  { id:"sarvam_saarika", platform:"Sarvam AI", model_name:"Sarvam Speech-to-Text", mode:"Batch", rate_usd_per_hour:0.3150, diarization_flat_usd_per_hr:0.1575, inr_native:true, rate_inr_per_hour:30, diarization_flat_inr_per_hr:15, latency:"Async", notes:"INR-native (₹30/hr base + ₹15/hr diarization = ₹45/hr)" },
+  { id:"sarvam_saaras", platform:"Sarvam AI", model_name:"Sarvam Speech-to-Text & Translate", mode:"Batch", rate_usd_per_hour:0.3150, diarization_flat_usd_per_hr:0.1575, inr_native:true, rate_inr_per_hour:30, diarization_flat_inr_per_hr:15, latency:"Async", notes:"INR-native ₹30/hr base + ₹15/hr diariz. Transcribes + translates Indic audio → English." },
+  { id:"bhashini_asr", platform:"Bhashini", model_name:"ASR Indian Lang", mode:"Batch", rate_usd_per_hour:0.00, diarization_flat_usd_per_hr:0.00, inr_native:true, rate_inr_per_hour:0, diarization_flat_inr_per_hr:0, latency:"Async", notes:"Govt of India free tier; diarization N/A" },
 ];
 
 const LLM_DATA = [
@@ -1768,9 +1768,9 @@ const TTS_DATA = [
   { id:"azure_hd", platform:"Azure", model_name:"HD Voices", tier:"Premium", rate_usd_per_1m_chars:22.00, notes:"HD voices reduced March 2026" },
   { id:"deepgram_aura2", platform:"Deepgram", model_name:"Aura-2 Streaming", tier:"Standard", rate_usd_per_1m_chars:30.00, notes:"Aura-2 $0.030/1K chars (deepgram.com)" },
   { id:"elevenlabs_flash", platform:"ElevenLabs", model_name:"Flash v2.5", tier:"Standard", rate_usd_per_1m_chars:50.00, notes:"Official API rate $0.05/1K chars (elevenlabs.io/pricing/api)" },
-  { id:"sarvam_bulbul_std", platform:"Sarvam AI", model_name:"Bulbul v2 Standard", tier:"Standard", rate_usd_per_1m_chars:15.75, notes:"INR-native ₹1,500/1M chars" },
-  { id:"sarvam_bulbul_prem", platform:"Sarvam AI", model_name:"Bulbul v3 Premium", tier:"Premium", rate_usd_per_1m_chars:31.50, notes:"INR-native ₹3,000/1M chars" },
-  { id:"bhashini_tts", platform:"Bhashini", model_name:"TTS Indian Lang", tier:"Standard", rate_usd_per_1m_chars:0.00, notes:"Govt of India free tier" },
+  { id:"sarvam_bulbul_std", platform:"Sarvam AI", model_name:"Bulbul v2 Standard", tier:"Standard", rate_usd_per_1m_chars:15.75, inr_native:true, rate_inr_per_1m_chars:1500, notes:"INR-native ₹1,500/1M chars" },
+  { id:"sarvam_bulbul_prem", platform:"Sarvam AI", model_name:"Bulbul v3 Premium", tier:"Premium", rate_usd_per_1m_chars:31.50, inr_native:true, rate_inr_per_1m_chars:3000, notes:"INR-native ₹3,000/1M chars" },
+  { id:"bhashini_tts", platform:"Bhashini", model_name:"TTS Indian Lang", tier:"Standard", rate_usd_per_1m_chars:0.00, inr_native:true, rate_inr_per_1m_chars:0, notes:"Govt of India free tier" },
 ];
 
 // Recommendations are auto-computed at render time from the current
@@ -1848,25 +1848,42 @@ function totalOutputTokens() { return state.outTokens * numCalls(); }
 function totalTtsChars() { return state.ttsChars * numCalls(); }
 
 function sttMonthlyINR(stt) {
+  // INR-native STT (Sarvam) uses its fixed INR rate; FX changes don't affect it
+  if (stt.inr_native) {
+    let rate = stt.rate_inr_per_hour;
+    if (state.diarization && stt.diarization_flat_inr_per_hr) rate += stt.diarization_flat_inr_per_hr;
+    return rate * audioHours();
+  }
   let rate = stt.rate_usd_per_hour;
   if (state.diarization && stt.diarization_flat_usd_per_hr) rate += stt.diarization_flat_usd_per_hr;
   return rate * audioHours() * state.fx;
 }
 function llmMonthlyINR(llm) {
   if (llm.input_per_1m_usd === null) return null;
+  // INR-native models (Sarvam) use their fixed INR rate; FX changes don't affect them
+  if (llm.inr_native) {
+    const inCost = (totalInputTokens() / 1e6) * llm.input_per_1m_inr;
+    const outCost = (totalOutputTokens() / 1e6) * llm.output_per_1m_inr;
+    return inCost + outCost;
+  }
   const inCost = (totalInputTokens() / 1e6) * llm.input_per_1m_usd;
   const outCost = (totalOutputTokens() / 1e6) * llm.output_per_1m_usd;
   return (inCost + outCost) * state.fx;
 }
 function ttsMonthlyINR(tts) {
+  if (tts.inr_native) {
+    return (totalTtsChars() / 1e6) * tts.rate_inr_per_1m_chars;
+  }
   return (totalTtsChars() / 1e6) * tts.rate_usd_per_1m_chars * state.fx;
 }
 function llmInputCostINR(llm) {
   if (llm.input_per_1m_usd === null) return null;
+  if (llm.inr_native) return (totalInputTokens() / 1e6) * llm.input_per_1m_inr;
   return (totalInputTokens() / 1e6) * llm.input_per_1m_usd * state.fx;
 }
 function llmOutputCostINR(llm) {
   if (llm.output_per_1m_usd === null) return null;
+  if (llm.inr_native) return (totalOutputTokens() / 1e6) * llm.output_per_1m_inr;
   return (totalOutputTokens() / 1e6) * llm.output_per_1m_usd * state.fx;
 }
 
@@ -2839,8 +2856,20 @@ function renderBreakdown() {
 
 // Reusable per-leg renderers (return HTML for the inner content)
 function renderSttBreakdown(s, hours) {
-  const sttRateUsd = s.rate_usd_per_hour + (state.diarization ? s.diarization_flat_usd_per_hr : 0);
   const sttCost = sttMonthlyINR(s);
+  if (s.inr_native) {
+    const baseRate = s.rate_inr_per_hour;
+    const diarizRate = s.diarization_flat_inr_per_hr || 0;
+    const effectiveRate = baseRate + (state.diarization ? diarizRate : 0);
+    return `<table>
+      <tr><td>Base rate</td><td>₹${baseRate.toFixed(2)} / hr  (INR-native)</td></tr>
+      ${state.diarization && diarizRate > 0 ? `<tr><td>+ Diarization add-on</td><td>₹${diarizRate.toFixed(2)} / hr</td></tr>` : ""}
+      <tr><td>Effective rate</td><td>₹${effectiveRate.toFixed(2)} / hr</td></tr>
+      <tr><td>× Audio hours</td><td>${Math.round(hours).toLocaleString("en-IN")} hrs</td></tr>
+      <tr class="total-row"><td>STT monthly</td><td>₹${Math.round(sttCost).toLocaleString("en-IN")}</td></tr>
+    </table>`;
+  }
+  const sttRateUsd = s.rate_usd_per_hour + (state.diarization ? s.diarization_flat_usd_per_hr : 0);
   return `<table>
     <tr><td>Base rate</td><td>₹${(s.rate_usd_per_hour * state.fx).toFixed(2)} / hr  ($${s.rate_usd_per_hour.toFixed(4)})</td></tr>
     ${state.diarization && s.diarization_flat_usd_per_hr > 0 ? `<tr><td>+ Diarization add-on</td><td>₹${(s.diarization_flat_usd_per_hr * state.fx).toFixed(2)} / hr</td></tr>` : ""}
@@ -2856,13 +2885,16 @@ function renderLlmBreakdown(l, calls) {
   const llmInCost = llmInputCostINR(l);
   const llmOutCost = llmOutputCostINR(l);
   const llmCost = llmMonthlyINR(l);
+  // INR-native models (Sarvam, Bhashini) show their actual INR rate, not recomputed from USD via current FX
+  const inputRateINR = l.inr_native ? l.input_per_1m_inr : (l.input_per_1m_usd * state.fx);
+  const outputRateINR = l.inr_native ? l.output_per_1m_inr : (l.output_per_1m_usd * state.fx);
   return `<table>
     <tr><td>Input tokens / call</td><td>${(state.transcriptTokens + state.sysTokens + state.kbTokens).toLocaleString("en-IN")} (transcript ${state.transcriptTokens} + system ${state.sysTokens} + KB ${state.kbTokens})</td></tr>
     <tr><td>Output tokens / call</td><td>${state.outTokens.toLocaleString("en-IN")}</td></tr>
     <tr><td>Total input × ${calls.toLocaleString("en-IN")} calls</td><td>${inTok.toLocaleString("en-IN")} tokens</td></tr>
     <tr><td>Total output × ${calls.toLocaleString("en-IN")} calls</td><td>${outTok.toLocaleString("en-IN")} tokens</td></tr>
-    <tr><td>Input cost @ ₹${(l.input_per_1m_usd * state.fx).toFixed(2)}/1M</td><td>₹${Math.round(llmInCost).toLocaleString("en-IN")}</td></tr>
-    <tr><td>Output cost @ ₹${(l.output_per_1m_usd * state.fx).toFixed(2)}/1M</td><td>₹${Math.round(llmOutCost).toLocaleString("en-IN")}</td></tr>
+    <tr><td>Input cost @ ₹${inputRateINR.toFixed(2)}/1M</td><td>₹${Math.round(llmInCost).toLocaleString("en-IN")}</td></tr>
+    <tr><td>Output cost @ ₹${outputRateINR.toFixed(2)}/1M</td><td>₹${Math.round(llmOutCost).toLocaleString("en-IN")}</td></tr>
     <tr class="total-row"><td>LLM monthly</td><td>₹${Math.round(llmCost).toLocaleString("en-IN")}</td></tr>
   </table>`;
 }
@@ -2870,9 +2902,12 @@ function renderLlmBreakdown(l, calls) {
 function renderTtsBreakdown(t, calls) {
   const chars = totalTtsChars();
   const ttsCost = ttsMonthlyINR(t);
+  const rateText = t.inr_native
+    ? `₹${t.rate_inr_per_1m_chars.toLocaleString("en-IN")} / 1M chars (INR-native)`
+    : `₹${Math.round(t.rate_usd_per_1m_chars * state.fx).toLocaleString("en-IN")} / 1M chars`;
   return `<table>
     <tr><td>Chars / response × ${calls.toLocaleString("en-IN")} calls</td><td>${chars.toLocaleString("en-IN")} chars</td></tr>
-    <tr><td>Rate</td><td>₹${Math.round(t.rate_usd_per_1m_chars * state.fx).toLocaleString("en-IN")} / 1M chars</td></tr>
+    <tr><td>Rate</td><td>${rateText}</td></tr>
     <tr class="total-row"><td>TTS monthly</td><td>₹${Math.round(ttsCost).toLocaleString("en-IN")}</td></tr>
   </table>`;
 }
@@ -4706,6 +4741,9 @@ function init() {
 // LIVE PRICING LOADER — pulls from Google Sheets CSVs at page load.
 // Anyone with the edit link can change the sheet; the dashboard re-reads
 // it on every page load. Falls back to hardcoded arrays if fetch fails.
+// Now correctly handles INR-native rows (Sarvam, Bhashini) by populating
+// inr_native + rate_inr_per_hour / rate_inr_per_1m_chars / *_per_1m_inr
+// so the new dashboard logic uses INR directly without USD round-trip.
 // ====================================================================
 const SHEETS = {
   config: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTfb6WevE-P9kT_Uvc0HzGpOXX-laPH8RURr8aHjLi2RNXvLT-duyUbnBEGBEGQ6A/pub?gid=1045787876&single=true&output=csv",
@@ -4714,7 +4752,6 @@ const SHEETS = {
   tts:    "https://docs.google.com/spreadsheets/d/e/2PACX-1vTfb6WevE-P9kT_Uvc0HzGpOXX-laPH8RURr8aHjLi2RNXvLT-duyUbnBEGBEGQ6A/pub?gid=1172297806&single=true&output=csv",
 };
 
-// Tiny CSV parser that handles quoted fields, embedded commas and newlines.
 function parseCSV(text) {
   const rows = [];
   let row = [], field = "", inQuotes = false;
@@ -4739,8 +4776,6 @@ function parseCSV(text) {
 
 const toNum = v => {
   if (v === null || v === undefined || v === "") return null;
-  // Strip currency symbols ($, ₹, €, £), thousand-separator commas, and any whitespace
-  // that Google Sheets bakes into published CSVs from formatted number cells.
   const cleaned = String(v).replace(/[₹$€£,\s]/g, "");
   if (!cleaned) return null;
   const n = parseFloat(cleaned);
@@ -4753,8 +4788,6 @@ async function fetchCSV(url) {
   return parseCSV(await res.text());
 }
 
-// Convert a sheet (array of rows) into objects, using the row that starts
-// with "id" as the header row.
 function rowsToObjects(rows) {
   const hdrIdx = rows.findIndex(r => r && r[0] === "id");
   if (hdrIdx < 0) return [];
@@ -4794,7 +4827,9 @@ async function loadPricingFromSheets() {
         const inr = toNum(o["Rate (INR/hr)"]);
         const diarUsd = toNum(o["Diarization Flat (USD/hr)"]);
         const diarInr = toNum(o["Diarization Flat (INR/hr)"]);
-        return {
+        // INR-native: USD column blank but INR column has a value (Sarvam, Bhashini)
+        const isInrNative = usd == null && inr != null;
+        const row = {
           id: o.id,
           platform: o.Platform,
           model_name: o.Model,
@@ -4804,6 +4839,12 @@ async function loadPricingFromSheets() {
           latency: o.Mode === "Realtime" ? "Realtime" : (o.Mode === "Both" ? "Both" : "Async"),
           notes: o.Notes || ""
         };
+        if (isInrNative) {
+          row.inr_native = true;
+          row.rate_inr_per_hour = inr;
+          row.diarization_flat_inr_per_hr = diarInr != null ? diarInr : 0;
+        }
+        return row;
       });
       STT_DATA.length = 0;
       STT_DATA.push(...mapped);
@@ -4817,6 +4858,7 @@ async function loadPricingFromSheets() {
         const outUsd = toNum(o["Output (USD/1M)"]);
         const inInr = toNum(o["Input (INR/1M)"]);
         const outInr = toNum(o["Output (INR/1M)"]);
+        const isInrNative = inUsd == null && inInr != null;
         const row = {
           id: o.id,
           model_name: o.Model,
@@ -4825,7 +4867,7 @@ async function loadPricingFromSheets() {
           output_per_1m_usd: outUsd != null ? outUsd : (outInr != null ? outInr / fx : null),
           notes: o.Notes || ""
         };
-        if (inInr != null && inUsd == null) {
+        if (isInrNative) {
           row.inr_native = true;
           row.input_per_1m_inr = inInr;
           row.output_per_1m_inr = outInr;
@@ -4842,7 +4884,8 @@ async function loadPricingFromSheets() {
       const mapped = ttsObjs.map(o => {
         const usd = toNum(o["Rate (USD/1M chars)"]);
         const inr = toNum(o["Rate (INR/1M chars)"]);
-        return {
+        const isInrNative = usd == null && inr != null;
+        const row = {
           id: o.id,
           platform: o.Platform,
           model_name: o.Model,
@@ -4850,6 +4893,11 @@ async function loadPricingFromSheets() {
           rate_usd_per_1m_chars: usd != null ? usd : (inr != null ? inr / fx : 0),
           notes: o.Notes || ""
         };
+        if (isInrNative) {
+          row.inr_native = true;
+          row.rate_inr_per_1m_chars = inr;
+        }
+        return row;
       });
       TTS_DATA.length = 0;
       TTS_DATA.push(...mapped);
